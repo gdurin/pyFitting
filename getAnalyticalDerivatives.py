@@ -58,11 +58,12 @@ def getDiff(independentVars, function_string, varsDiff):
             function_string = function_string.replace(op, opNew)
         
      # Do the loop over the variables varsDiff
-    for vD in varsDiff:
-        exec "derivative = sympy.diff(f,%s)" % vD
+    for variableToDiff in varsDiff:
+        exec "derivative = sympy.diff(f,%s)" % variableToDiff
         derivative = str(derivative)
         # We must check if the derivative is not a constant, 
         # as it can give problems with the jacobian
+        # i.e. must have the same lenght of 'x' data
         for var in independentVars:
             if var not in derivative:
                 derivative = "%s*%s/%s" % (derivative, var, var)

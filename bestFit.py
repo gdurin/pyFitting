@@ -6,28 +6,26 @@ import scipy
 import numpy as np
 from numpy import pi
 import matplotlib.pylab as pylab
-import scipy.optimize
 import scipy.special
 from scipy.optimize.minpack import leastsq
 import numexpr as ne
 from time import time
 from getAnalyticalDerivatives import getDiff
-from matplotlib import rc
-rc('font', **{'family':'sans-serif','sans-serif':['Helvetica']})
-rc('text', usetex=True)
-#operators = ["exp","log", "log10","cos","sin","tan","tanh"]
-
+#from matplotlib import rc
+#rc('font', **{'family':'sans-serif','sans-serif':['Helvetica']})
+#rc('text', usetex=True)
 
 
 class Theory:
-    def __init__(self, xName, function, paramsNames, params0, analyDeriv):
+    def __init__(self, xName, function, paramsNames, params0, analyDeriv=None):
         self.xName = xName
         self.parameters = paramsNames
         self.initialParams = params0
         self.parStr = self.parameters.split(",")
         self.fz = function
         self.checkFunction = True 
-        if analyDeriv:
+        self.analyDeriv = analyDeriv
+        if True:
             paramsNamesList = paramsNames.split(",")
             # Calculate the analytical derivatives
             self.derivs = getDiff(xName, function, paramsNamesList)
@@ -58,14 +56,12 @@ class Theory:
         jb = []
         exec "%s = parameterValues" % self.parameters
         exec "%s = x" % self.xName
-        # Prepare the dictionary of all the variables in the derivatives
         for q in self.derivsCompiled:
             values = map(eval, q.input_names)
             jb.append(q(*values))
-        jb = scipy.array(jb)/sigma
-
+        jb = scipy.array(jb)
         #jb = scipy.array(map(ne.evaluate,self.derivs))/sigma
-        return jb
+        return jb/sigma
     
 class DataCurve:
     def __init__(self, fileName, cols, dataRange=(0,None)):
@@ -113,7 +109,7 @@ def func(params, data, theory):
 def jacobian(params, theory, data, linlog,sigma):
     return theory.jacobian(data.X, params,sigma)
 
-def plotBestFitT(theory, data, linlog, sigma, analyticalDerivs=False, noplot=False):
+def plotBestFitT(theory, data, linlog, sigma=None, analyticalDerivs=False, noplot=False):
     t0 = time()
     printOut = []
     table = []
@@ -123,26 +119,23 @@ def plotBestFitT(theory, data, linlog, sigma, analyticalDerivs=False, noplot=Fal
     initCost = cost(params0, theory, data,linlog,sigma)
     printOut.append(initCost)
     print 'initial cost = %.10e (StD: %.10e)' % cost(params0, theory, data,linlog,sigma)
+    maxfev = 500*(len(params0)+1)
     if analyticalDerivs:
         full_output = leastsq(residual,params0,args=(theory,data,linlog,sigma),\
-                              Dfun=jacobian, col_deriv=True, full_output=1)
+                              maxfev=maxfev, Dfun=jacobian, col_deriv=True, full_output=1)
     else:
         full_output = leastsq(residual,params0,\
-                              args=(theory,data,linlog,sigma), full_output=1)
-    params = full_output[0]
+                              args=(theory,data,linlog,sigma), maxfev=maxfev, full_output=1)
+    params, covmatrix, infodict, mesg, ier = full_output
     costValue, costStdDev = cost(params, theory, data, sigma=sigma, linlog='lin')
     print 'optimized cost = %.10e (StD: %.10e)' % (costValue, costStdDev)
     printOut.append(costValue)
-    covarianceMatrix = full_output[1]
-    # Check che value of the cov. matrix
-    #jcb = jacobian(params, theory, data, linlog,sigma)
-    #covMatrix = scipy.matrix(scipy.dot(jcb, jcb.T)).I
-    #print covarianceMatrix
-    #print "================="
-    #print covMatrix
-    #print "================="
-    #print covarianceMatrix/covMatrix
-    if covarianceMatrix is None:
+    jcb = jacobian(params, theory, data, linlog,sigma)
+    # The method of calculating the covariance matrix as
+    # analyCovMatrix = scipy.matrix(scipy.dot(jcb, jcb.T)).I
+    # is not valid in some cases. A general solution is to make the QR 
+    # decomposition, as done by the routine
+    if covmatrix is None: # fitting not converging
         for i in range(len(params)):
             stOut = theory.parStr[i], '\t', params[i]
             print theory.parStr[i], '\t', params[i]
@@ -150,23 +143,26 @@ def plotBestFitT(theory, data, linlog, sigma, analyticalDerivs=False, noplot=Fal
     else:
         for i in range(len(params)):
             if sigma: # This is the case of weigthed least-square
-                stDevParams = scipy.sqrt(covarianceMatrix[i,i])
+                stDevParams = covmatrix[i,i]**0.5
             else:
-                stDevParams = scipy.sqrt(covarianceMatrix[i,i])*costStdDev
+                stDevParams = covmatrix[i,i]**0.5*costStdDev
             par = params[i]
             table.append([theory.parStr[i], par, stDevParams, par/stDevParams])
             #if abs(params[i]) > 1e5:
                 #print "%s = %.8e +- %.8e" % (theory.parStr[i].ljust(5), params[i], stDevParams)
             #else:
                 #print "%s = %.8f +- %.8f" % (theory.parStr[i].ljust(5), params[i], stDevParams)
-            stOut = theory.parStr[i], '\t', params[i], '+-', scipy.sqrt(covarianceMatrix[i,i])
+            stOut = theory.parStr[i], '\t', params[i], '+-', stDevParams
+            
             printOut.append(stOut)    
-    print "===================="
+    print "====================================="
     pprint_table(table)
-    print "===================="
+    print "====================================="
+    print "Done in %d iterations" % infodict['nfev']
+    print mesg
+    print "====================================="        
     # Chi2 test
     # n. of degree of freedom
-    print "Done in %d iteractions" % full_output[2]['nfev']
     print "n. of data = %d" % data.len()
     dof = data.len() - len(params)
     print "degree of freedom = %d" % (dof)
@@ -176,13 +172,14 @@ def plotBestFitT(theory, data, linlog, sigma, analyticalDerivs=False, noplot=Fal
     ts = round(time() - t0, 3)
     print "*** Time elapsed:", ts
     if not noplot:
-        P = theory.Y(data.X,params)
-        if linlog == "lin":
-            pylab.plot(data.X,data.Y, 'bo',data.X,P,'r')
-        else: 
-            pylab.loglog(data.X,data.Y, 'bo',data.X,P,'r')
+        calculatedData= theory.Y(data.X,params)
         if sigma is not None:
             pylab.errorbar(data.X,data.Y, sigma)
+        if linlog == "lin":
+            pylab.plot(data.X,data.Y, 'bo',data.X,calculatedData,'r')
+        else: 
+            pylab.loglog(data.X,data.Y, 'bo',data.X,calculatedData,'r')
+
         pylab.show()
     # Alternative fitting
     #full_output = scipy.optimize.curve_fit(func,data.X,data.Y,params0,None)
@@ -236,8 +233,8 @@ def main():
     func = "a+b*x"
     sigma = None
     helpString = """
-    bestFit v.0.1.0
-    july 26 - 2011
+    bestFit v.0.1.1
+    july 28 - 2011
 
     Usage summary: bestFit [OPTIONS]
 
@@ -250,7 +247,7 @@ def main():
     -i, --initvals     Initial values of the parameters (separated by comas)
     -t, --theory       Theoerical function to best fit the data
     -s, --sigma        Estimation of the error in the data
-    -d, --derivs    Use analytical derivatives
+    -d, --derivs    Use analytical derivatives [symb, auto]
     --lin              Use data in linear mode (default)
     --log              Use data il log mode (best for log-log data)
     --noplot         Don't show the plot output
@@ -286,7 +283,9 @@ def main():
             cols = [int(i) for i in cols]
             del sys.argv[1]
         elif option == '-d' or option == '--deriv':
+            #aDtype = sys.argv[1]
             analyticalDerivs = True
+            #del sys.argv[1]
         elif option == '-v' or option == "--vars":
             variables = tuple(sys.argv[1].split(","))
             del sys.argv[1]
