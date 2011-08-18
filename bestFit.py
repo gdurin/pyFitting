@@ -2,19 +2,40 @@
 
 import sys
 import locale
-import scipy
+import scipy as sp
+from scipy.optimize.minpack import leastsq
+import scipy.special as special
 import numpy as np
 from numpy import pi
 import matplotlib.pylab as pylab
-import scipy.special
-from scipy.optimize.minpack import leastsq
 import numexpr as ne
 from time import time
+import re
 from getAnalyticalDerivatives import getDiff
-#from matplotlib import rc
-#rc('font', **{'family':'sans-serif','sans-serif':['Helvetica']})
-#rc('text', usetex=True)
 
+
+def genExpr2Scipy(op, function):
+    """
+    Insert the proper scipy.* module to handle math functions
+    """
+    try:
+        if op in dir(sp):
+            sub = "sp."
+            function = function.replace(op, sub+op)
+        elif op in dir(special):
+            op_occurrences = [q for q in dir(special) if op in q]
+            op_occurrences_in_function = [q for q in op_occurrences if q in function]
+            if len(op_occurrences_in_function) > 1:
+                for q in op_occurrences_in_function:
+                    string_to_search = r'\b'+q
+                    function = re.sub(string_to_search, 'special.'+q, function) 
+            else:
+                sub = "special."
+                function = function.replace(op, sub+op)
+        return function
+    except:
+        print("Function %s not defined in scipy" % op)
+        return None
 
 class Theory:
     def __init__(self, xName, function, paramsNames, params0, analyDeriv=None):
@@ -25,16 +46,20 @@ class Theory:
         self.fz = function
         self.checkFunction = True 
         self.analyDeriv = analyDeriv
-        if True:
-            paramsNamesList = paramsNames.split(",")
-            # Calculate the analytical derivatives
-            self.derivs = getDiff(xName, function, paramsNamesList)
-            # Then compiled them  to be reused by NumExpr
-            self.derivsCompiled = map(ne.NumExpr, self.derivs)
-            
+        paramsNamesList = paramsNames.split(",")
+        # Calculate the analytical derivatives
+        # Return None if not available
+        self.analyDeriv = getDiff(xName, function, paramsNamesList)
+        try: 
+            # Then try to compile them  to be reused by NumExpr
+            self.derivsCompiled = map(ne.NumExpr, self.analyDeriv)
+        except TypeError:
+            print("Warning:  one or more functions are undefined in NumExpr")
+            self.derivsCompiled = None
+
     def Y(self, x, params):
         exec "%s = params" % self.parameters
-        # Check if the function needs to be changed with np.functions
+        # Check if the function needs to be changed with sp.functions
         if self.checkFunction:
             while self.checkFunction:
                 try:
@@ -42,7 +67,11 @@ class Theory:
                     self.checkFunction = False
                 except NameError as inst:
                     op = inst.message.split("'")[1]
-                    self.fz = self.fz.replace(op, "np."+op)
+                    function = genExpr2Scipy(op, self.fz)
+                    if function:
+                        self.fz = function
+                    else:
+                        raise ValueError("Function %s not found" % op)
         else:
             exec "f = %s" % (self.fz)
         return f
@@ -54,23 +83,39 @@ class Theory:
         if sigma == None: 
             sigma = 1.
         jb = []
+        checkDerivative = True
         exec "%s = parameterValues" % self.parameters
         exec "%s = x" % self.xName
-        for q in self.derivsCompiled:
-            values = map(eval, q.input_names)
-            jb.append(q(*values))
-        jb = scipy.array(jb)
-        #jb = scipy.array(map(ne.evaluate,self.derivs))/sigma
-        return jb/sigma
-    
+        if self.derivsCompiled:
+            for q in self.derivsCompiled:
+                values = map(eval, q.input_names)
+                jb.append(q(*values))
+        else:
+            for i, q in enumerate(self.analyDeriv):
+                #print(q)
+                while checkDerivative:
+                    try:
+                        exec "deriv = %s" % q
+                        self.analyDeriv[i] = q
+                        print i, q
+                        checkDerivative = False
+                    except NameError as inst:
+                        op = inst.message.split("'")[1]
+                        q = genExpr2Scipy(op, q)
+                        #print("Name error", q)
+                jb.append(deriv)
+                checkDerivative = True
+            print self.analyDeriv
+        return sp.array(jb)/sigma
+
 class DataCurve:
     def __init__(self, fileName, cols, dataRange=(0,None)):
-        data = scipy.loadtxt(fileName)
+        data = sp.loadtxt(fileName)
         i0,i1 = dataRange
         self.X = data[:,cols[0]][i0:i1]
         self.Y = data[:,cols[1]][i0:i1]
         if len(cols) > 2:
-            self.Yerror = 2.*data[:,cols[2]][i0:i1]
+            self.Yerror = data[:,cols[2]][i0:i1]
         else:
             self.Yerror = None
         self.typeColors = 'b'
@@ -79,27 +124,23 @@ class DataCurve:
     def len(self):
         return len(self.X)
 
-    
+
 def residual(params, theory, data, linlog, sigma=None, logResidual=False):
     """Calculate residual for fitting"""
     residuals = np.array([])
     if sigma is None:  sigma = 1.
-    P = theory.Y(data.X,params)
+    P = theory.Y(data.X, params)
     if not logResidual:
         res = (P - data.Y)/sigma
     else:
-        res = (scipy.log10(P)-scipy.log10(data.Y))/sigma
-    residuals = np.concatenate((residuals,res))
+        res = (sp.log10(P) - sp.log10(data.Y))/sigma
+    residuals = np.concatenate((residuals, res))
     return residuals
 
 def cost(params, theory, data, linlog, sigma):
-    res = residual(params,theory,data,linlog,sigma)
+    res = residual(params, theory, data, linlog, sigma)
     cst = np.dot(res,res)
-    # Standard error of the regression 
-    # see parameter SER in 
-    # http://en.wikipedia.org/wiki/Numerical_methods_for_linear_least_squares
-    # under: Parameter errors, correlation and confidence limits
-    #
+    # Standard error of the regression
     ser = (cst/(data.len()-len(params)))**0.5
     return cst, ser
 
@@ -132,7 +173,7 @@ def plotBestFitT(theory, data, linlog, sigma=None, analyticalDerivs=False, noplo
     printOut.append(costValue)
     jcb = jacobian(params, theory, data, linlog,sigma)
     # The method of calculating the covariance matrix as
-    # analyCovMatrix = scipy.matrix(scipy.dot(jcb, jcb.T)).I
+    # analyCovMatrix = sp.matrix(sp.dot(jcb, jcb.T)).I
     # is not valid in some cases. A general solution is to make the QR 
     # decomposition, as done by the routine
     if covmatrix is None: # fitting not converging
@@ -142,7 +183,7 @@ def plotBestFitT(theory, data, linlog, sigma=None, analyticalDerivs=False, noplo
             printOut.append(stOut)
     else:
         for i in range(len(params)):
-            if sigma: # This is the case of weigthed least-square
+            if not sigma == None: # This is the case of weigthed least-square
                 stDevParams = covmatrix[i,i]**0.5
             else:
                 stDevParams = covmatrix[i,i]**0.5*costStdDev
@@ -153,7 +194,7 @@ def plotBestFitT(theory, data, linlog, sigma=None, analyticalDerivs=False, noplo
             #else:
                 #print "%s = %.8f +- %.8f" % (theory.parStr[i].ljust(5), params[i], stDevParams)
             stOut = theory.parStr[i], '\t', params[i], '+-', stDevParams
-            
+
             printOut.append(stOut)    
     print "====================================="
     pprint_table(table)
@@ -166,23 +207,22 @@ def plotBestFitT(theory, data, linlog, sigma=None, analyticalDerivs=False, noplo
     print "n. of data = %d" % data.len()
     dof = data.len() - len(params)
     print "degree of freedom = %d" % (dof)
-    pValue = 1.-scipy.special.gammainc(dof/2., costValue/2.)
+    pValue = 1.-sp.special.gammainc(dof/2., costValue/2.)
     print "X^2_rel = %f" % (costValue/dof)
     print "pValue = %f (statistically significant if < 0.05)" % (pValue)
     ts = round(time() - t0, 3)
     print "*** Time elapsed:", ts
     if not noplot:
         calculatedData= theory.Y(data.X,params)
-        if sigma is not None:
-            pylab.errorbar(data.X,data.Y, sigma)
         if linlog == "lin":
             pylab.plot(data.X,data.Y, 'bo',data.X,calculatedData,'r')
         else: 
             pylab.loglog(data.X,data.Y, 'bo',data.X,calculatedData,'r')
-
+        if sigma is not None:
+            pylab.errorbar(data.X,data.Y, sigma,fmt=None)
         pylab.show()
     # Alternative fitting
-    #full_output = scipy.optimize.curve_fit(func,data.X,data.Y,params0,None)
+    #full_output = sp.optimize.curve_fit(func,data.X,data.Y,params0,None)
     #print "Alternative fitting"
     #print full_output
 
@@ -201,7 +241,7 @@ def format_num(num):
 def get_max_width(table, index):
     """Get the maximum width of the given column index"""
     return max([len(format_num(row[index])) for row in table])    
-    
+
 def pprint_table(table, out=sys.stdout):
     """Prints out a table of data, padded for alignment
     @param out: Output stream (file-like object)
@@ -233,27 +273,27 @@ def main():
     func = "a+b*x"
     sigma = None
     helpString = """
-    bestFit v.0.1.1
-    july 28 - 2011
+    bestFit v.0.1.2
+    august 18 - 2011
 
     Usage summary: bestFit [OPTIONS]
 
     OPTIONS:
-    -f, --filename     Filename of the data in form of columns
-    -c, --cols         Columns to get the data (defaults: 0,1); a third number is used for errors' column
+    -f, --filename   Filename of the data in form of columns
+    -c, --cols          Columns to get the data (defaults: 0,1); a third number is used for errors' column
     -v, --vars         Variables (defaults: x,y)
-    -r, --range        Range of the data to consider (i.e. 0:4; 0:-1 takes all)
+    -r, --range       Range of the data to consider (i.e. 0:4; 0:-1 takes all)
     -p, --fitpars      Fitting Parameters names (separated by comas)
-    -i, --initvals     Initial values of the parameters (separated by comas)
-    -t, --theory       Theoerical function to best fit the data
-    -s, --sigma        Estimation of the error in the data
-    -d, --derivs    Use analytical derivatives [symb, auto]
-    --lin              Use data in linear mode (default)
-    --log              Use data il log mode (best for log-log data)
-    --noplot         Don't show the plot output
+    -i, --initvals      Initial values of the parameters (separated by comas)
+    -t, --theory       Theoretical function to best fit the data (between "...")
+    -s, --sigma       Estimation of the error in the data (as a constant value)
+    -d, --derivs      Use analytical derivatives
+    --lin                 Use data in linear mode (default)
+    --log                Use data il log mode (best for log-log data)
+    --noplot           Don't show the plot output
 
     EXAMPLE
-    bestfit -f mydata.dat -c 0,2 -r 10:-1 -v x,y -p a,b -i 1,1. -t a+b*x
+    bestfit -f mydata.dat -c 0,2 -r 10:-1 -v x,y -p a,b -i 1,1. -t "a+b*x"
     """
     failString = "Failed: Not enough input filenames specified"
 
@@ -326,13 +366,15 @@ def main():
             else:
                 print "Error in setting the data range: use min:max"
                 sys.exit()
-                
+
     data = DataCurve(fileName,cols,dataRange)
     theory = Theory(variables[0], func, parNames, params0,analyticalDerivs)
     if data.Yerror is not None:
         sigma = data.Yerror
+    if not theory.analyDeriv:
+        analyticalDerivs = False
     plotBestFitT(theory,data,linlog,sigma, analyticalDerivs,noPlot)
 
-    
+
 if __name__ == "__main__":
     main()

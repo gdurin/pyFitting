@@ -53,8 +53,12 @@ def getDiff(independentVars, function_string, varsDiff):
             op = inst.message.split("'")[1]
             if op in NUMPY_TRANSLATIONS:
                 opNew = "sympy."+NUMPY_TRANSLATIONS[op]
-            else:
+            elif op in dir(sympy):
                 opNew = "sympy."+ op
+            else:
+                print("Warning: %s does not exist in sympy" % op)
+                print("No analytical derivatives are used")
+                return None
             function_string = function_string.replace(op, opNew)
         
      # Do the loop over the variables varsDiff
@@ -69,3 +73,10 @@ def getDiff(independentVars, function_string, varsDiff):
                 derivative = "%s*%s/%s" % (derivative, var, var)
         diffs.append(derivative)
     return diffs
+
+if __name__ == "__main__":
+    f = "b1*gamma(x/b4)+b2/x**b3"
+    derivList = "b1,b2,b3,b4".split(",")
+    derivs = getDiff("x",f, derivList)
+    for d in derivs:
+        print d
