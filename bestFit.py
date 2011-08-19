@@ -97,7 +97,6 @@ class Theory:
                     try:
                         exec "deriv = %s" % q
                         self.analyDeriv[i] = q
-                        print i, q
                         checkDerivative = False
                     except NameError as inst:
                         op = inst.message.split("'")[1]
@@ -151,6 +150,8 @@ def jacobian(params, theory, data, linlog,sigma):
     return theory.jacobian(data.X, params,sigma)
 
 def plotBestFitT(theory, data, linlog, sigma=None, analyticalDerivs=False, noplot=False):
+    nStars = 80
+    print("="*nStars)
     t0 = time()
     printOut = []
     table = []
@@ -196,12 +197,12 @@ def plotBestFitT(theory, data, linlog, sigma=None, analyticalDerivs=False, noplo
             stOut = theory.parStr[i], '\t', params[i], '+-', stDevParams
 
             printOut.append(stOut)    
-    print "====================================="
+    print("="*nStars)
     pprint_table(table)
-    print "====================================="
+    print("="*nStars)        
     print "Done in %d iterations" % infodict['nfev']
     print mesg
-    print "====================================="        
+    print("="*nStars)
     # Chi2 test
     # n. of degree of freedom
     print "n. of data = %d" % data.len()
@@ -273,8 +274,8 @@ def main():
     func = "a+b*x"
     sigma = None
     helpString = """
-    bestFit v.0.1.2
-    august 18 - 2011
+    bestFit v.0.1.3
+    august 19 - 2011
 
     Usage summary: bestFit [OPTIONS]
 
