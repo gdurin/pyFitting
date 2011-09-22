@@ -9,19 +9,23 @@ The routine is based on the scipy.optimize.leastsq method (see http://docs.scipy
 
 This is a command line tool, to keep everything easy and fast to use. 
 
-0. INSTALLATION
----------------
+0. Download and installation
+----------------------------
 
-bestFit.py requires the following packages::
+The easiest way to install bestFit is::
+   
+    $ git clone git://github.com/gdurin/pyFitting.git
 
-* python 2.7.x (because of the print("Print this") statement. It can be easily change to the 2.6.x version print "Print this"
-* numpy and scipy  (see http://www.scipy.org)
-* matplotlib (1.0.x - see http://matplotlib.sourceforge.net/ )
-* numexpr (see http://code.google.com/p/)
+It requires the following packages::
+
+python 2.7.x (because of the print("Print this") statement. It can be easily change to the 2.6.x version print "Print this"
+numpy and scipy  (see http://www.scipy.org)
+matplotlib (1.0.x - see http://matplotlib.sourceforge.net/ )
+numexpr (see http://code.google.com/p/)
 
 If not present, install them with easy_install, i.e. easy_install numexpr (under root)
 
-1. HOW TO USE IT
+1. How to use it
 ----------------
 
 Make the bestFit.py executable (under Linux: chmod +x bestFit.py) and run it without any option. The output is the following::
@@ -35,23 +39,23 @@ Make the bestFit.py executable (under Linux: chmod +x bestFit.py) and run it wit
 
     OPTIONS:
     -f, --filename   Filename of the data in form of columns
-    -c, --cols          Columns to get the data (defaults: 0,1); a third number is used for errors' column
-    -v, --vars         Variables (defaults: x,y)
-    -r, --range       Range of the data to consider (i.e. 0:4; 0:-1 takes all)
-    -p, --fitpars      Fitting Parameters names (separated by comas)
-    -i, --initvals      Initial values of the parameters (separated by comas)
-    -t, --theory       Theoretical function to best fit the data (between "...")
-    -s, --sigma       Estimation of the error in the data (as a constant value)
-    -d, --derivs      Use analytical derivatives
-    --lin                 Use data in linear mode (default)
-    --log                Use data il log mode (best for log-log data)
-    --noplot           Don't show the plot output
+    -c, --cols       Columns to get the data (defaults: 0,1); a third number is used for errors' column
+    -v, --vars       Variables (defaults: x,y)
+    -r, --range      Range of the data to consider (i.e. 0:4; 0:-1 takes all)
+    -p, --fitpars    Fitting Parameters names (separated by comas)
+    -i, --initvals   Initial values of the parameters (separated by comas)
+    -t, --theory     Theoretical function to best fit the data (between "...")
+    -s, --sigma      Estimation of the error in the data (as a constant value)
+    -d, --derivs     Use analytical derivatives
+    --lin            Use data in linear mode (default)
+    --log            Use data il log mode (best for log-log data)
+    --noplot         Don't show the plot output
 
     EXAMPLE
     bestfit -f mydata.dat -c 0,2 -r 10:-1 -v x,y -p a,b -i 1,1. -t "a+b*x"
 
 
-2. TEST THE SCRIPT
+2. Test the script
 ------------------
 
 To be sure that the script is working correctly, try one of the test fits included.
