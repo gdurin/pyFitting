@@ -12,7 +12,14 @@ This is a command line tool, to keep everything easy and fast to use.
 0. INSTALLATION
 ---------------
 
-See the included file INSTALL.txt
+bestFit.py requires the following packages::
+
+* python 2.7.x (because of the print("Print this") statement. It can be easily change to the 2.6.x version print "Print this"
+* numpy and scipy  (see http://www.scipy.org)
+* matplotlib (1.0.x - see http://matplotlib.sourceforge.net/ )
+* numexpr (see http://code.google.com/p/)
+
+If not present, install them with easy_install, i.e. easy_install numexpr (under root)
 
 1. HOW TO USE IT
 ----------------
