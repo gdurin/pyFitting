@@ -7,7 +7,8 @@ from scipy.optimize.minpack import leastsq
 import scipy.special as special
 import numpy as np
 from numpy import pi
-import matplotlib.pylab as pylab
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 import numexpr as ne
 from time import time
 import re
@@ -110,6 +111,7 @@ class Theory:
 class DataCurve:
     def __init__(self, fileName, cols, dataRange=(0,None)):
         data = sp.loadtxt(fileName)
+        self.fileName = fileName
         i0,i1 = dataRange
         self.X = data[:,cols[0]][i0:i1]
         self.Y = data[:,cols[1]][i0:i1]
@@ -124,14 +126,15 @@ class DataCurve:
         return len(self.X)
 
 
-def residual(params, theory, data, linlog, sigma=None, logResidual=False):
+def residual(params, theory, data, linlog, sigma=None):
     """Calculate residual for fitting"""
     residuals = np.array([])
     if sigma is None:  sigma = 1.
     P = theory.Y(data.X, params)
-    if not logResidual:
+    if linlog=='lin':
         res = (P - data.Y)/sigma
-    else:
+    elif linlog=='log':
+        #print sp.log10(P), sp.log10(data.Y)
         res = (sp.log10(P) - sp.log10(data.Y))/sigma
     residuals = np.concatenate((residuals, res))
     return residuals
@@ -149,7 +152,7 @@ def func(params, data, theory):
 def jacobian(params, theory, data, linlog,sigma):
     return theory.jacobian(data.X, params,sigma)
 
-def plotBestFitT(theory, data, linlog, sigma=None, analyticalDerivs=False, noplot=False):
+def plotBestFitT(theory, data, linlog, sigma=None, analyticalDerivs=False, isPlot='lin'):
     nStars = 80
     print("="*nStars)
     t0 = time()
@@ -158,9 +161,9 @@ def plotBestFitT(theory, data, linlog, sigma=None, analyticalDerivs=False, noplo
     table.append(['parameter', 'value', 'st. error', 't-statistics'])
     params0 = theory.initialParams
     print "Initial parameters = ", params0
-    initCost = cost(params0, theory, data,linlog,sigma)
+    initCost = cost(params0, theory,data,linlog,sigma)
     printOut.append(initCost)
-    print 'initial cost = %.10e (StD: %.10e)' % cost(params0, theory, data,linlog,sigma)
+    print 'initial cost = %.10e (StD: %.10e)' % cost(params0, theory,data,linlog,sigma)
     maxfev = 500*(len(params0)+1)
     if analyticalDerivs:
         full_output = leastsq(residual,params0,args=(theory,data,linlog,sigma),\
@@ -169,7 +172,7 @@ def plotBestFitT(theory, data, linlog, sigma=None, analyticalDerivs=False, noplo
         full_output = leastsq(residual,params0,\
                               args=(theory,data,linlog,sigma), maxfev=maxfev, full_output=1)
     params, covmatrix, infodict, mesg, ier = full_output
-    costValue, costStdDev = cost(params, theory, data, sigma=sigma, linlog='lin')
+    costValue, costStdDev = cost(params,theory,data,linlog,sigma)
     print 'optimized cost = %.10e (StD: %.10e)' % (costValue, costStdDev)
     printOut.append(costValue)
     jcb = jacobian(params, theory, data, linlog,sigma)
@@ -208,26 +211,30 @@ def plotBestFitT(theory, data, linlog, sigma=None, analyticalDerivs=False, noplo
     print "n. of data = %d" % data.len()
     dof = data.len() - len(params)
     print "degree of freedom = %d" % (dof)
-    pValue = 1.-sp.special.gammainc(dof/2., costValue/2.)
+    pValue = 1. - sp.special.gammainc(dof/2., costValue/2.)
     print "X^2_rel = %f" % (costValue/dof)
     print "pValue = %f (statistically significant if < 0.05)" % (pValue)
     ts = round(time() - t0, 3)
     print "*** Time elapsed:", ts
-    if not noplot:
+    if isPlot:
         calculatedData= theory.Y(data.X,params)
-        if linlog == "lin":
-            pylab.plot(data.X,data.Y, 'bo',data.X,calculatedData,'r')
+        if isPlot == "lin":
+            plt.plot(data.X,data.Y,'bo',data.X,calculatedData,'r')
         else: 
-            pylab.loglog(data.X,data.Y, 'bo',data.X,calculatedData,'r')
+            plt.loglog(data.X,data.Y,'bo',data.X,calculatedData,'r')    
         if sigma is not None:
-            pylab.errorbar(data.X,data.Y, sigma,fmt=None)
-        pylab.show()
+            plt.errorbar(data.X,data.Y, sigma,fmt=None)
+        plt.title(data.fileName)
+        #plt.show()
     # Alternative fitting
     #full_output = sp.optimize.curve_fit(func,data.X,data.Y,params0,None)
     #print "Alternative fitting"
     #print full_output
-
-    return
+        fig2 = plt.figure(2)
+        plt.semilogx(data.X, data.Y-theory.Y(data.X,params),'-ro')
+        plt.draw()
+        plt.show()
+    return params
 
 
 def format_num(num):
@@ -266,13 +273,16 @@ def pprint_table(table, out=sys.stdout):
 def main():
     # default values of input parameters:
     linlog = "lin"
+    isPlot = 'lin'
     dataRangeMin = 0
     dataRangeMax = None
     dataRange = dataRangeMin, dataRangeMax
     cols = 0,1
     parNames = "a,b"
+    variables = "x","y"
     func = "a+b*x"
     sigma = None
+    analyticalDerivs = False
     helpString = """
     bestFit v.0.1.3
     august 19 - 2011
@@ -289,9 +299,10 @@ def main():
     -t, --theory       Theoretical function to best fit the data (between "...")
     -s, --sigma       Estimation of the error in the data (as a constant value)
     -d, --derivs      Use analytical derivatives
-    --lin                 Use data in linear mode (default)
+    --lin                 Use data in linear mode (default)    
     --log                Use data il log mode (best for log-log data)
     --noplot           Don't show the plot output
+    --logplot          Use log-log to plot data (default if --log)
 
     EXAMPLE
     bestfit -f mydata.dat -c 0,2 -r 10:-1 -v x,y -p a,b -i 1,1. -t "a+b*x"
@@ -309,9 +320,6 @@ def main():
         print helpString
         sys.exit()
 
-    variables = "x","y"
-    analyticalDerivs = False
-    noPlot = False
     # read variables from the command line, one by one:
     while len(sys.argv) > 1:
         option = sys.argv[1]
@@ -324,9 +332,7 @@ def main():
             cols = [int(i) for i in cols]
             del sys.argv[1]
         elif option == '-d' or option == '--deriv':
-            #aDtype = sys.argv[1]
             analyticalDerivs = True
-            #del sys.argv[1]
         elif option == '-v' or option == "--vars":
             variables = tuple(sys.argv[1].split(","))
             del sys.argv[1]
@@ -342,15 +348,18 @@ def main():
                 pOut.append(float(p))
             params0 = tuple(pOut)
             del sys.argv[1]
-        elif '-log' in option :
+        elif option=='--log':
             linlog = "log"
-        elif  '-lin' in option:
-            linlog = "lin"        
-        elif '-s' in option:
+            isPlot = 'log'
+        elif option=='--lin':
+            linlog = "lin"
+        elif option=='-s':
             sigma = float(sys.argv[1])
             del sys.argv[1]
-        elif '--noplot':
-            noPlot = True
+        elif option=='--noplot' :
+            isPlot = False
+        elif option=='--logplot':
+            isPlot = 'log'
         elif option == '-r' or option == "--range":
             dataRange = sys.argv[1]
             if ":" in dataRange:
@@ -369,13 +378,14 @@ def main():
                 sys.exit()
 
     data = DataCurve(fileName,cols,dataRange)
-    theory = Theory(variables[0], func, parNames, params0,analyticalDerivs)
+    theory = Theory(variables[0], func,parNames, params0,analyticalDerivs)
     if data.Yerror is not None:
         sigma = data.Yerror
     if not theory.analyDeriv:
         analyticalDerivs = False
-    plotBestFitT(theory,data,linlog,sigma, analyticalDerivs,noPlot)
+    params = plotBestFitT(theory,data,linlog,sigma,analyticalDerivs,isPlot)
 
-
+    
 if __name__ == "__main__":
+    plt.ioff()
     main()
