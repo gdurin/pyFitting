@@ -225,15 +225,16 @@ def plotBestFitT(theory, data, linlog, sigma=None, analyticalDerivs=False, isPlo
         if sigma is not None:
             plt.errorbar(data.X,data.Y, sigma,fmt=None)
         plt.title(data.fileName)
-        #plt.show()
+        plt.draw()
+        plt.show()
     # Alternative fitting
     #full_output = sp.optimize.curve_fit(func,data.X,data.Y,params0,None)
     #print "Alternative fitting"
     #print full_output
-        fig2 = plt.figure(2)
-        plt.semilogx(data.X, data.Y-theory.Y(data.X,params),'-ro')
-        plt.draw()
-        plt.show()
+        #fig2 = plt.figure(2)
+        #plt.semilogx(data.X, data.Y-theory.Y(data.X,params),'-ro')
+        #plt.draw()
+        #plt.show()
     return params
 
 
@@ -284,8 +285,6 @@ def main():
     sigma = None
     analyticalDerivs = False
     helpString = """
-    bestFit v.0.1.3
-    august 19 - 2011
 
     Usage summary: bestFit [OPTIONS]
 
@@ -302,9 +301,9 @@ def main():
     --lin                 Use data in linear mode (default)    
     --log                Use data il log mode (best for log-log data)
     --noplot           Don't show the plot output
-    --logplot          Use log-log to plot data (default if --log)
+    --logplot          Use log-log axis to plot data (default if --log)
 
-    EXAMPLE
+    EXAMPLE:
     bestfit -f mydata.dat -c 0,2 -r 10:-1 -v x,y -p a,b -i 1,1. -t "a+b*x"
     """
     failString = "Failed: Not enough input filenames specified"

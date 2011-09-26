@@ -35,9 +35,6 @@ Make the bestFit.py executable (under Linux: chmod +x bestFit.py) and run it wit
 
     Failed: Not enough input filenames specified
 
-    bestFit v.0.1.2
-    august 18 - 2011
-
     Usage summary: bestFit [OPTIONS]
 
     OPTIONS:
@@ -53,6 +50,7 @@ Make the bestFit.py executable (under Linux: chmod +x bestFit.py) and run it wit
     --lin            Use data in linear mode (default)
     --log            Use data il log mode (best for log-log data)
     --noplot         Don't show the plot output
+    --logplot        Use log-log axis to plot data (default if --log)
 
     EXAMPLE
     bestfit -f mydata.dat -c 0,2 -r 10:-1 -v x,y -p a,b -i 1,1. -t "a+b*x"
@@ -66,7 +64,7 @@ To be sure that the script is working correctly, try one of the test fits includ
 For instance, try to fit the eckerle4 data (see: http://www.itl.nist.gov/div898/strd/nls/data/eckerle4.shtml for details). 
 This is a case considered of high difficulty.
 
-On the command line copy the following line:: 
+Now copy the following line:: 
 
    $ ./bestFit.py -f test/eckerle4/data.dat -p b1,b2,b3 -t "b1/b2*exp(-(x-b3)**2/(2.*b2**2))" -i 1.,10.,500. -c 1,0 -d
 
