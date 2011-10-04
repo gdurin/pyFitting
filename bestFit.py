@@ -81,13 +81,14 @@ class Theory:
     r"""
     Defines the theoretical function to fit the data with (the model)
     """
-    def __init__(self, xName, function, paramsNames, dFunc=False):
+    def __init__(self, xName, function, paramsNames, heldParams = None, dFunc=False):
         self.xName = xName
         self.parameters = paramsNames
         self.fz = function
         self.fzOriginal = function
         self.checkFunction = True 
         paramsNamesList = paramsNames.split(",")
+        self.heldParams = heldParams
         # Calculate the analytical derivatives
         # Return None if not available
         self.dFunc = dFunc
@@ -102,6 +103,9 @@ class Theory:
 
     def Y(self, x, params):
         exec "%s = params" % self.parameters
+        if self.heldParams:
+            for par in self.heldParams:
+                exec "%s = %s" % (par, self.heldParams[par])
         # Check if the function needs to be changed with scipy.functions
         if self.checkFunction:
             while self.checkFunction:
@@ -126,6 +130,9 @@ class Theory:
         jb = []
         checkDerivative = True
         exec "%s = parameterValues" % self.parameters
+        if self.heldParams:
+            for par in self.heldParams:
+                exec "%s = %s" % (par, self.heldParams[par])
         exec "%s = x" % self.xName
         if self.dFuncCompiled:
             for q in self.dFuncCompiled:
@@ -168,14 +175,14 @@ class Model():
     to calculate the residual and the cost
     """
     def __init__(self,dataAndFunction, cols, dataRange, variables, parNames, \
-                 linlog='lin', sigma=None, dFunc=False):
+                 heldParams=None,linlog='lin', sigma=None, dFunc=False):
         fileName, func = dataAndFunction
         self.data = DataCurve(fileName, cols, dataRange)
-        self.theory = Theory(variables[0], func, parNames, dFunc)
+        self.theory = Theory(variables[0], func, parNames, heldParams, dFunc)
         self.dFunc = self.theory.dFunc
         self.linlog = linlog
         self.sigma = self.data.Yerror
-
+        
     def residual(self, params):
         """Calculate residual for fitting"""
         self.residuals = np.array([])
@@ -335,7 +342,7 @@ def plotBestFitT(compositeModel, params0, isPlot='lin'):
         #plt.semilogx(data.X, data.Y-theory.Y(data.X,params),'-ro')
         #plt.draw()
         #plt.show()
-    return params
+    return full_output
 
 
 
@@ -385,6 +392,8 @@ def main():
     func = "a+b*x"
     sigma = None
     dFunc = False
+    separator = "_and_"
+    heldParams = None
     helpString = """
 
     Usage summary: bestFit [OPTIONS]
@@ -399,6 +408,7 @@ def main():
     -t, --theory       Theoretical function to best fit the data (between "...")
     -s, --sigma       Estimation of the error in the data (as a constant value)
     -d, --derivs      Use analytical derivatives
+    -h, --held         Held one or more parameters to a fixed value (-h p1=0.2__p2=1.)         
     --lin                 Use data in linear mode (default)    
     --log                Use data il log mode (best for log-log data)
     --noplot           Don't show the plot output
@@ -408,7 +418,7 @@ def main():
     bestfit -f mydata.dat -c 0,2 -r 10:-1 -v x,y -p a,b -i 1,1. -t "a+b*x"
     """
     failString = "Failed: Not enough input filenames specified"
-    separator = "_and_"
+
 
     if len(sys.argv) == 1:
         print failString
@@ -422,15 +432,14 @@ def main():
 
     # read variables from the command line, one by one:
     while len(sys.argv) > 1:
-        option = sys.argv[1]
-        del sys.argv[1]
+        option = sys.argv.pop(1)
         if option == '-f' or option == "--filename":
             fileNames = sys.argv[1].split(separator)
             del sys.argv[1]
         elif option == '-c' or option == "--cols":
-            cols = sys.argv[1].split(",")
+            cols = sys.argv.pop(1)
+            cols = cols.split(",")
             cols = [int(i) for i in cols]
-            del sys.argv[1]
         elif option == '-d' or option == '--deriv':
             dFunc = True
         elif option == '-v' or option == "--vars":
@@ -448,6 +457,14 @@ def main():
                 pOut.append(float(p))
             params0 = tuple(pOut)
             del sys.argv[1]
+        elif option == '-h' or option == "--held":
+            heldParams = {}
+            held= sys.argv.pop(1)
+            held = held.split(separator)
+            for p in held:
+                [par,val] = p.split("=")
+                heldParams[par] = val
+            print heldParams
         elif option=='--log':
             linlog = "log"
             isPlot = 'log'
@@ -481,7 +498,8 @@ def main():
     models = []
     nmodels = len(fileNames)
     for i in range(nmodels):
-        model = Model(dataAndFunction[i],cols,dataRange, variables, parNames, linlog=linlog, dFunc=dFunc)
+        model = Model(dataAndFunction[i],cols,dataRange, variables, parNames, heldParams=heldParams,\
+                      linlog=linlog, dFunc=dFunc)
         models.append(model)
         if model.sigma is None and sigma is not None:
             model.sigma = sigma
