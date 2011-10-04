@@ -81,23 +81,24 @@ class Theory:
     r"""
     Defines the theoretical function to fit the data with (the model)
     """
-    def __init__(self, xName, function, paramsNames, analyDeriv=None):
+    def __init__(self, xName, function, paramsNames, dFunc=False):
         self.xName = xName
         self.parameters = paramsNames
         self.fz = function
         self.fzOriginal = function
         self.checkFunction = True 
-        self.analyDeriv = analyDeriv
         paramsNamesList = paramsNames.split(",")
         # Calculate the analytical derivatives
         # Return None if not available
-        self.analyDeriv = getDiff(xName, function, paramsNamesList)
+        self.dFunc = dFunc
+        if dFunc:
+            self.dFunc = getDiff(xName, function, paramsNamesList)
         try: 
             # Then try to compile them  to be reused by NumExpr
-            self.derivsCompiled = map(ne.NumExpr, self.analyDeriv)
+            self.dFuncCompiled = map(ne.NumExpr, self.dFunc)
         except TypeError:
             print("Warning:  one or more functions are undefined in NumExpr")
-            self.derivsCompiled = None
+            self.dFuncCompiled = None
 
     def Y(self, x, params):
         exec "%s = params" % self.parameters
@@ -126,17 +127,17 @@ class Theory:
         checkDerivative = True
         exec "%s = parameterValues" % self.parameters
         exec "%s = x" % self.xName
-        if self.derivsCompiled:
-            for q in self.derivsCompiled:
+        if self.dFuncCompiled:
+            for q in self.dFuncCompiled:
                 values = map(eval, q.input_names)
                 jb.append(q(*values))
         else:
-            for i, q in enumerate(self.analyDeriv):
+            for i, q in enumerate(self.dFunc):
                 #print(q)
                 while checkDerivative:
                     try:
                         exec "deriv = %s" % q
-                        self.analyDeriv[i] = q
+                        self.dFunc[i] = q
                         checkDerivative = False
                     except NameError as inst:
                         op = inst.message.split("'")[1]
@@ -144,7 +145,7 @@ class Theory:
                         #print("Name error", q)
                 jb.append(deriv)
                 checkDerivative = True
-            print self.analyDeriv
+            #print self.dFunc
         return scipy.array(jb)
 
 class DataCurve:
@@ -158,9 +159,7 @@ class DataCurve:
             self.Yerror = data[:,cols[2]][i0:i1]
         else:
             self.Yerror = None
-        self.typeColors = 'b'
-        self.typePoints = 'o'
-
+        
     def len(self):
         return len(self.X)
 
@@ -168,17 +167,22 @@ class Model():
     r"""Link data to theory, and provides all the methods
     to calculate the residual and the cost
     """
-    def __init__(self,dataAndFunction,cols,dataRange, variables, parNames, linlog='lin', sigma=None, analyticalDerivs=False):
+    def __init__(self,dataAndFunction, cols, dataRange, variables, parNames, \
+                 linlog='lin', sigma=None, dFunc=False):
         fileName, func = dataAndFunction
-        self.data = DataCurve(fileName,cols,dataRange)
-        self.theory = Theory(variables[0], func,parNames,analyticalDerivs)
+        self.data = DataCurve(fileName, cols, dataRange)
+        self.theory = Theory(variables[0], func, parNames, dFunc)
+        self.dFunc = self.theory.dFunc
         self.linlog = linlog
         self.sigma = self.data.Yerror
 
     def residual(self, params):
         """Calculate residual for fitting"""
         self.residuals = np.array([])
-        if self.sigma is None:  sigma = 1.
+        if self.sigma is None:  
+            sigma = 1.
+        else:
+            sigma = self.sigma
         P = self.theory.Y(self.data.X, params)
         if self.linlog=='lin':
             res = (P - self.data.Y)/sigma
@@ -200,6 +204,15 @@ class CompositeModel():
     def __init__(self,models,parNames):
         self.models = models
         self.parStr = parNames.split(",")
+        # Check if the model have the error in the data
+        # and use analytical derivatives
+        self.isSigma = None
+        self.isAnalyticalDerivs = False
+        for model in models:
+            if model.sigma is not None:
+                self.isSigma = True
+            if model.dFunc:
+                self.isAnalyticalDerivs = True
 
     def residual(self, params):
         res = scipy.array([])
@@ -223,7 +236,7 @@ class CompositeModel():
                 J = np.concatenate((J, model.jacobian(params)),1)
         return J
     
-def plotBestFitT(compositeModel, params0, linlog='lin',sigma=None, analyticalDerivs=False, isPlot='lin'):
+def plotBestFitT(compositeModel, params0, isPlot='lin'):
     nStars = 80
     print("="*nStars)
     t0 = time()
@@ -235,18 +248,22 @@ def plotBestFitT(compositeModel, params0, linlog='lin',sigma=None, analyticalDer
     printOut.append(initCost)
     print 'initial cost = %.10e (StD: %.10e)' % compositeModel.cost(params0)
     maxfev = 500*(len(params0)+1)
+    factor = 100
     residual = compositeModel.residual
     jacobian = compositeModel.jacobian
-    if analyticalDerivs:
-        full_output = leastsq(residual,params0,
-                              maxfev=maxfev, Dfun=jacobian, col_deriv=True, full_output=1)
+    if compositeModel.isAnalyticalDerivs:
+        full_output = leastsq(residual,params0,\
+                              maxfev=maxfev, Dfun=jacobian, col_deriv=True, \
+                              factor=factor,full_output=1)
     else:
-        full_output = leastsq(residual,params0, maxfev=maxfev, full_output=1)
+        full_output = leastsq(residual,params0, maxfev=maxfev, \
+                              factor=factor, full_output=1)
     params, covmatrix, infodict, mesg, ier = full_output
     costValue, costStdDev = compositeModel.cost(params)
     print 'optimized cost = %.10e (StD: %.10e)' % (costValue, costStdDev)
     printOut.append(costValue)
-    jcb = compositeModel.jacobian(params)
+    if compositeModel.isAnalyticalDerivs:
+        jcb = compositeModel.jacobian(params)
     # The method of calculating the covariance matrix as
     # analyCovMatrix = scipy.matrix(scipy.dot(jcb, jcb.T)).I
     # is not valid in some cases. A general solution is to make the QR 
@@ -258,7 +275,7 @@ def plotBestFitT(compositeModel, params0, linlog='lin',sigma=None, analyticalDer
             printOut.append(stOut)
     else:
         for i in range(len(params)):
-            if not sigma == None: # This is the case of weigthed least-square
+            if compositeModel.isSigma: # This is the case of weigthed least-square
                 stDevParams = covmatrix[i,i]**0.5
             else:
                 stDevParams = covmatrix[i,i]**0.5*costStdDev
@@ -305,10 +322,10 @@ def plotBestFitT(compositeModel, params0, linlog='lin',sigma=None, analyticalDer
             else: 
                 plt.loglog(X,Y,style,label=labelData)    
                 plt.loglog(X,calculatedData,color,label=labelTheory)    
-            if sigma is not None:
-                plt.errorbar(X,Y, sigma,fmt=None)
+            if model.sigma is not None:
+                plt.errorbar(X,Y, model.sigma,fmt=None)
             plt.draw()
-        plt.legend(loc=0)
+        #plt.legend(loc=0)
         plt.show()
     # Alternative fitting
     #full_output = scipy.optimize.curve_fit(func,data.X,data.Y,params0,None)
@@ -319,6 +336,7 @@ def plotBestFitT(compositeModel, params0, linlog='lin',sigma=None, analyticalDer
         #plt.draw()
         #plt.show()
     return params
+
 
 
 def format_num(num):
@@ -366,7 +384,7 @@ def main():
     variables = "x","y"
     func = "a+b*x"
     sigma = None
-    analyticalDerivs = False
+    dFunc = False
     helpString = """
 
     Usage summary: bestFit [OPTIONS]
@@ -390,7 +408,7 @@ def main():
     bestfit -f mydata.dat -c 0,2 -r 10:-1 -v x,y -p a,b -i 1,1. -t "a+b*x"
     """
     failString = "Failed: Not enough input filenames specified"
-
+    separator = "_and_"
 
     if len(sys.argv) == 1:
         print failString
@@ -407,19 +425,19 @@ def main():
         option = sys.argv[1]
         del sys.argv[1]
         if option == '-f' or option == "--filename":
-            fileNames = sys.argv[1].split(",")
+            fileNames = sys.argv[1].split(separator)
             del sys.argv[1]
         elif option == '-c' or option == "--cols":
             cols = sys.argv[1].split(",")
             cols = [int(i) for i in cols]
             del sys.argv[1]
         elif option == '-d' or option == '--deriv':
-            analyticalDerivs = True
+            dFunc = True
         elif option == '-v' or option == "--vars":
             variables = tuple(sys.argv[1].split(","))
             del sys.argv[1]
         elif option == '-t' or option == "--theory":
-            functions = sys.argv[1].split(",")
+            functions = sys.argv[1].split(separator)
             del sys.argv[1]
         elif option == '-p' or option == "--fitpars":
             parNames = sys.argv[1]
@@ -463,12 +481,12 @@ def main():
     models = []
     nmodels = len(fileNames)
     for i in range(nmodels):
-        model = Model(dataAndFunction[i],cols,dataRange, variables, parNames, linlog, analyticalDerivs)
+        model = Model(dataAndFunction[i],cols,dataRange, variables, parNames, linlog=linlog, dFunc=dFunc)
         models.append(model)
-    
+        if model.sigma is None and sigma is not None:
+            model.sigma = sigma
+            
     composite_model = CompositeModel(models, parNames)
-   #if not theory.analyDeriv:
-        #analyticalDerivs = False
     params = plotBestFitT(composite_model,params0,isPlot)
 
     
