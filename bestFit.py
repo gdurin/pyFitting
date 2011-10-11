@@ -5,6 +5,7 @@ using nonlinear least-squares minimization.
 """
 import sys
 import locale
+import argparse
 import scipy
 from scipy.optimize.minpack import leastsq
 import scipy.special as special
@@ -316,19 +317,20 @@ def plotBestFitT(compositeModel, params0, isPlot='lin'):
         getCol = getColor()
         getSyb = getSymbol()
         for model in compositeModel.models:
-            calculatedData= model.theory.Y(model.data.X,params)
             X = model.data.X
             Y = model.data.Y
+            X1 = scipy.linspace(X[0], X[-1], 300)
+            calculatedData= model.theory.Y(X1,params)
             color = getCol.next()
             style = getSyb.next() + color
             labelData = model.data.fileName
             labelTheory = model.theory.fzOriginal
             if isPlot == "lin":
                 plt.plot(X,Y,style,label=labelData)
-                plt.plot(X,calculatedData,color,label=labelTheory)
+                plt.plot(X1,calculatedData,color,label=labelTheory)
             else: 
                 plt.loglog(X,Y,style,label=labelData)    
-                plt.loglog(X,calculatedData,color,label=labelTheory)    
+                plt.loglog(X1,calculatedData,color,label=labelTheory)    
             if model.sigma is not None:
                 plt.errorbar(X,Y, model.sigma,fmt=None)
             plt.draw()
@@ -419,7 +421,12 @@ def main():
     """
     failString = "Failed: Not enough input filenames specified"
 
-
+    #parser = argparse.ArgumentParser(description='A simple python script to perform data fitting using nonlinear least-squares minimization.')
+    #parser.add_argument('-f','--filename')
+    
+    #args = parser.parse_args()
+    
+    #parser.print_help()
     if len(sys.argv) == 1:
         print failString
         print helpString
