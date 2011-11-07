@@ -22,6 +22,7 @@ import numexpr as ne
 from time import time
 import re
 from getAnalyticalDerivatives import getDiff
+#from scitools.StringFunction import StringFunction
 
 def getColor():
     colors = 'brgcmb'*4
@@ -85,28 +86,28 @@ class Theory:
     def __init__(self, xName, function, paramsNames, heldParams = None, dFunc=False):
         self.xName = xName
         self.parameters = paramsNames
+        paramsNamesList = paramsNames.split(",")
         self.fz = function
         self.fzOriginal = function
         self.checkFunction = True 
-        paramsNamesList = paramsNames.split(",")
         self.heldParams = heldParams
         # Calculate the analytical derivatives
         # Return None if not available
         self.dFunc = dFunc
         if dFunc:
             self.dFunc = getDiff(xName, function, paramsNamesList)
-        try: 
-            # Then try to compile them  to be reused by NumExpr
-            self.dFuncCompiled = map(ne.NumExpr, self.dFunc)
-        except TypeError:
-            print("Warning:  one or more functions are undefined in NumExpr")
-            self.dFuncCompiled = None
+            try: 
+                # Then try to compile them  to be reused by NumExpr
+                self.dFuncCompiled = map(ne.NumExpr, self.dFunc)
+            except TypeError:
+                print("Warning:  one or more functions are undefined in NumExpr")
+                self.dFuncCompiled = None
 
     def Y(self, x, params):
         exec "%s = params" % self.parameters
         if self.heldParams:
             for par in self.heldParams:
-                exec "%s = %s" % (par, self.heldParams[par])
+                exec "%s = %s" % (par, str(self.heldParams[par]))
         # Check if the function needs to be changed with scipy.functions
         if self.checkFunction:
             while self.checkFunction:
@@ -133,7 +134,7 @@ class Theory:
         exec "%s = parameterValues" % self.parameters
         if self.heldParams:
             for par in self.heldParams:
-                exec "%s = %s" % (par, self.heldParams[par])
+                exec "%s = %s" % (par, str(self.heldParams[par]))
         exec "%s = x" % self.xName
         if self.dFuncCompiled:
             for q in self.dFuncCompiled:
@@ -141,7 +142,6 @@ class Theory:
                 jb.append(q(*values))
         else:
             for i, q in enumerate(self.dFunc):
-                #print(q)
                 while checkDerivative:
                     try:
                         exec "deriv = %s" % q
@@ -150,10 +150,8 @@ class Theory:
                     except NameError as inst:
                         op = inst.message.split("'")[1]
                         q = genExpr2Scipy(op, q)
-                        #print("Name error", q)
                 jb.append(deriv)
                 checkDerivative = True
-            #print self.dFunc
         return scipy.array(jb)
 
 class DataCurve:
@@ -173,10 +171,10 @@ class DataCurve:
 
 class Model():
     r"""Link data to theory, and provides all the methods
-    to calculate the residual and the cost
+    to calculate the residual, the jacobian and the cost
     """
-    def __init__(self,dataAndFunction, cols, dataRange, variables, parNames, \
-                 heldParams=None,linlog='lin', sigma=None, dFunc=False):
+    def __init__(self, dataAndFunction, cols, dataRange, variables, parNames, \
+                 heldParams=None, linlog='lin', sigma=None, dFunc=False):
         fileName, func = dataAndFunction
         self.data = DataCurve(fileName, cols, dataRange)
         self.theory = Theory(variables[0], func, parNames, heldParams, dFunc)
@@ -192,24 +190,23 @@ class Model():
         else:
             sigma = self.sigma
         P = self.theory.Y(self.data.X, params)
-        if self.linlog=='lin':
+        if self.linlog == 'lin':
             res = (P - self.data.Y)/sigma
-        elif self.linlog=='log':
-            #print scipy.log10(P), scipy.log10(data.Y)
+        elif self.linlog == 'log':
             res = (scipy.log10(P) - scipy.log10(self.data.Y))/sigma
         self.residuals = np.concatenate((self.residuals, res))
         return self.residuals
 
     def jacobian(self, params):
-        jb = self.theory.jacobian(self.data.X, params)
+        jac = self.theory.jacobian(self.data.X, params)
         if self.sigma is not None:
-            jb = jb/self.sigma
-        return jb
+            jac = jac/self.sigma
+        return jac
 
 class CompositeModel():
     r"""Join the models
     """
-    def __init__(self,models,parNames):
+    def __init__(self, models, parNames):
         self.models = models
         self.parStr = parNames.split(",")
         # Check if the model have the error in the data
@@ -225,7 +222,7 @@ class CompositeModel():
     def residual(self, params):
         res = scipy.array([])
         for model in self.models:
-            res = np.concatenate((model.residual(params), res))
+            res = np.concatenate((res, model.residual(params)))
         return res
         
     def cost(self, params):
@@ -239,10 +236,10 @@ class CompositeModel():
     def jacobian(self, params):
         for i, model in enumerate(self.models):
             if i == 0:
-                J = model.jacobian(params)
+                jac = model.jacobian(params)
             else:
-                J = np.concatenate((J, model.jacobian(params)),1)
-        return J
+                jac = np.concatenate((jac, model.jacobian(params)), axis=1)
+        return jac
     
 def plotBestFitT(compositeModel, params0, isPlot='lin'):
     nStars = 80
@@ -250,30 +247,32 @@ def plotBestFitT(compositeModel, params0, isPlot='lin'):
     t0 = time()
     printOut = []
     table = []
-    table.append(['parameter', 'value', 'st. error', 't-statistics'])
+    table.append(['parameter', 'value', 'st. error', 't-statistic'])
     print "Initial parameters = ", params0
     initCost = compositeModel.cost(params0)
     printOut.append(initCost)
     print 'initial cost = %.10e (StD: %.10e)' % compositeModel.cost(params0)
-    maxfev = 500*(len(params0)+1)
+    maxfev = 50*(len(params0)+1)
     factor = 100
     residual = compositeModel.residual
-    jacobian = compositeModel.jacobian
     if compositeModel.isAnalyticalDerivs:
-        full_output = leastsq(residual,params0,\
+        jacobian = compositeModel.jacobian
+        full_output = leastsq(residual, params0,\
                               maxfev=maxfev, Dfun=jacobian, col_deriv=True, \
-                              factor=factor,full_output=1)
+                              factor=factor, full_output=1)
     else:
-        full_output = leastsq(residual,params0, maxfev=maxfev, \
+        full_output = leastsq(residual, params0, maxfev=maxfev, \
                               factor=factor, full_output=1)
     params, covmatrix, infodict, mesg, ier = full_output
     costValue, costStdDev = compositeModel.cost(params)
     print 'optimized cost = %.10e (StD: %.10e)' % (costValue, costStdDev)
     printOut.append(costValue)
-    if compositeModel.isAnalyticalDerivs:
-        jcb = compositeModel.jacobian(params)
-    # The method of calculating the covariance matrix as
-    # analyCovMatrix = scipy.matrix(scipy.dot(jcb, jcb.T)).I
+    #if compositeModel.isAnalyticalDerivs:
+        #jcb = jacobian(params)
+    ## The method of calculating the covariance matrix as
+        #analyCovMatrix = scipy.matrix(scipy.dot(jcb, jcb.T)).I
+        #print analyCovMatrix
+        #print covmatrix
     # is not valid in some cases. A general solution is to make the QR 
     # decomposition, as done by the routine
     if covmatrix is None: # fitting not converging
@@ -320,19 +319,19 @@ def plotBestFitT(compositeModel, params0, isPlot='lin'):
             X = model.data.X
             Y = model.data.Y
             X1 = scipy.linspace(X[0], X[-1], 300)
-            calculatedData= model.theory.Y(X1,params)
+            calculatedData= model.theory.Y(X1, params)
             color = getCol.next()
             style = getSyb.next() + color
             labelData = model.data.fileName
             labelTheory = model.theory.fzOriginal
             if isPlot == "lin":
-                plt.plot(X,Y,style,label=labelData)
-                plt.plot(X1,calculatedData,color,label=labelTheory)
+                plt.plot(X, Y, style, label=labelData)
+                plt.plot(X1, calculatedData, color, label=labelTheory)
             else: 
-                plt.loglog(X,Y,style,label=labelData)    
-                plt.loglog(X1,calculatedData,color,label=labelTheory)    
+                plt.loglog(X, Y, style, label=labelData)    
+                plt.loglog(X1, calculatedData, color, label=labelTheory)    
             if model.sigma is not None:
-                plt.errorbar(X,Y, model.sigma,fmt=None)
+                plt.errorbar(X, Y, model.sigma, fmt=None)
             plt.draw()
         #plt.legend(loc=0)
         plt.show()
@@ -345,8 +344,6 @@ def plotBestFitT(compositeModel, params0, isPlot='lin'):
         #plt.draw()
         #plt.show()
     return full_output
-
-
 
 def format_num(num):
     """Format a number according to given places.
@@ -382,137 +379,92 @@ def pprint_table(table, out=sys.stdout):
         print >> out
 
 def main():
-    # default values of input parameters:
-    linlog = "lin"
-    isPlot = 'lin'
-    dataRangeMin = 0
-    dataRangeMax = None
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Best fit of data using least-square minimization')
+    parser.add_argument('-f','--filename', metavar='filename', nargs='+', required=True,
+                       help='Filename(s) of the input data')
+    parser.add_argument('-t','--theory', metavar='theory', nargs='+', required=True,
+                        help='Theoretical function(s)')
+    parser.add_argument('-p','--params', metavar='params', required=True,  nargs='+',
+                        help='Parameter(s) name(s), i.e. -p a b c')
+    parser.add_argument('-i','--initvals', metavar='initvals', required=True, type=float, nargs='+',
+                        help='Initial values of the parameter(s), i.e. -i 1 2. 3.')
+    parser.add_argument('-v', '--var', metavar='var', default='x y', nargs='+',
+                        help='Variable(s) names, default: x y')
+    parser.add_argument('-c','--cols', metavar='cols', default=[0, 1],  type=int, nargs='+',
+                       help='Columns of the file to load the data, default: 0 1')
+    parser.add_argument('-r', '--drange', metavar='range', default='0:None',
+                        help='Range of the data (as index of rows)')
+    parser.add_argument('-d', '--deriv', action='store_true',
+                        help='Use Analytical Derivatives')
+    parser.add_argument('-s','--sigma', metavar='sigma', type=float, default=None,
+                        help='Estimation of the error in the data (as a constant value)')
+    parser.add_argument('--held', metavar='heldParams', nargs='+', default = None,
+                        help='Held one or more parameters, i.e. a=3 b=4')
+    parser.add_argument('--lin', action='store_true',
+                        help='Use data in linear mode (default)')
+    parser.add_argument('--log', action='store_true',
+                        help='Use data in log mode (best for log-log data)')
+    parser.add_argument('--noplot', action='store_true',
+                        help=r"Don't show the plot output")
+    parser.add_argument('--logplot', action='store_true',
+                        help='Use log-log axis to plot data (default if --log)')
+    
+    
+    args = parser.parse_args()
+    print args
+    fileNames = args.filename
+    cols =  args.cols
+    variables = args.var
+    functions = args.theory
+    parNames = ",".join(args.params)
+    params0 = tuple(args.initvals)
+    if args.held:
+        heldParams = {}
+        for p in args.held:
+            [par,val] = p.split("=")
+            heldParams[par] = float(val)
+    else:
+        heldParams = None
+        
+    dFunc = args.deriv
+    
+    dataRange = args.drange
+    m, M = dataRange.split(":")
+    if m == "":
+        dataRangeMin = 0
+    else:
+        dataRangeMin = int(m)
+    if M == "" or M == 'None':
+        dataRangeMax = None
+    else:
+        dataRangeMax = int(M)
     dataRange = dataRangeMin, dataRangeMax
-    cols = 0,1
-    parNames = "a,b"
-    variables = "x","y"
-    func = "a+b*x"
-    sigma = None
-    dFunc = False
-    separator = "_and_"
-    heldParams = None
-    helpString = """
-
-    Usage summary: bestFit [OPTIONS]
-
-    OPTIONS:
-    -f, --filename   Filename of the data in form of columns
-    -c, --cols          Columns to get the data (defaults: 0,1); a third number is used for errors' column
-    -v, --vars         Variables (defaults: x,y)
-    -r, --range       Range of the data to consider (i.e. 0:4; 0:-1 takes all)
-    -p, --fitpars      Fitting Parameters names (separated by comas)
-    -i, --initvals      Initial values of the parameters (separated by comas)
-    -t, --theory       Theoretical function to best fit the data (between "...")
-    -s, --sigma       Estimation of the error in the data (as a constant value)
-    -d, --derivs      Use analytical derivatives
-    -h, --held         Held one or more parameters to a fixed value (-h p1=0.2__p2=1.)         
-    --lin                 Use data in linear mode (default)    
-    --log                Use data il log mode (best for log-log data)
-    --noplot           Don't show the plot output
-    --logplot          Use log-log axis to plot data (default if --log)
-
-    EXAMPLE:
-    bestfit -f mydata.dat -c 0,2 -r 10:-1 -v x,y -p a,b -i 1,1. -t "a+b*x"
-    """
-    failString = "Failed: Not enough input filenames specified"
-
-    #parser = argparse.ArgumentParser(description='A simple python script to perform data fitting using nonlinear least-squares minimization.')
-    #parser.add_argument('-f','--filename')
     
-    #args = parser.parse_args()
-    
-    #parser.print_help()
-    if len(sys.argv) == 1:
-        print failString
-        print helpString
-        sys.exit()
-
-    if "-f" not in sys.argv and "--filename" not in sys.argv:
-        print failString
-        print helpString
-        sys.exit()
-
-    # read variables from the command line, one by one:
-    while len(sys.argv) > 1:
-        option = sys.argv.pop(1)
-        if option == '-f' or option == "--filename":
-            fileNames = sys.argv[1].split(separator)
-            del sys.argv[1]
-        elif option == '-c' or option == "--cols":
-            cols = sys.argv.pop(1)
-            cols = cols.split(",")
-            cols = [int(i) for i in cols]
-        elif option == '-d' or option == '--deriv':
-            dFunc = True
-        elif option == '-v' or option == "--vars":
-            variables = tuple(sys.argv[1].split(","))
-            del sys.argv[1]
-        elif option == '-t' or option == "--theory":
-            functions = sys.argv[1].split(separator)
-            del sys.argv[1]
-        elif option == '-p' or option == "--fitpars":
-            parNames = sys.argv[1]
-            del sys.argv[1]
-        elif option == '-i' or option == "--initvals":
-            pOut = []
-            for p in sys.argv[1].split(","):
-                pOut.append(float(p))
-            params0 = tuple(pOut)
-            del sys.argv[1]
-        elif option == '-h' or option == "--held":
-            heldParams = {}
-            held= sys.argv.pop(1)
-            held = held.split(separator)
-            for p in held:
-                [par,val] = p.split("=")
-                heldParams[par] = val
-            print heldParams
-        elif option=='--log':
-            linlog = "log"
-            isPlot = 'log'
-        elif option=='--lin':
-            linlog = "lin"
-        elif option=='-s':
-            sigma = float(sys.argv[1])
-            del sys.argv[1]
-        elif option=='--noplot' :
-            isPlot = False
-        elif option=='--logplot':
-            isPlot = 'log'
-        elif option == '-r' or option == "--range":
-            dataRange = sys.argv[1]
-            if ":" in dataRange:
-                m, M = dataRange.split(":")
-                if m == "":
-                    dataRangeMin = 0
-                else:
-                    dataRangeMin = int(m)
-                if M == "":
-                    dataRangeMax = None
-                else:
-                    dataRangeMax = int(M)
-                dataRange = dataRangeMin, dataRangeMax
-            else:
-                print "Error in setting the data range: use min:max"
-                sys.exit()
+    linlog = "lin"
+    isPlot = "lin"
+    if args.log:
+        linlog = "log"
+        isPlot = 'log'
+    if args.noplot:
+        isPlot = False
+    if args.logplot:
+        isPlot = 'log'
+    sigma = args.sigma
 
     dataAndFunction = zip(fileNames, functions)
     models = []
     nmodels = len(fileNames)
     for i in range(nmodels):
-        model = Model(dataAndFunction[i],cols,dataRange, variables, parNames, heldParams=heldParams,\
-                      linlog=linlog, dFunc=dFunc)
+        model = Model(dataAndFunction[i], cols, dataRange, variables, parNames, \
+                      heldParams=heldParams, linlog=linlog, dFunc=dFunc)
         models.append(model)
         if model.sigma is None and sigma is not None:
             model.sigma = sigma
-            
+
     composite_model = CompositeModel(models, parNames)
-    params = plotBestFitT(composite_model,params0,isPlot)
+    params = plotBestFitT(composite_model, params0, isPlot)
 
     
 if __name__ == "__main__":

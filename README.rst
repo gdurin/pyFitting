@@ -30,31 +30,52 @@ If not present, install them with easy_install, i.e. easy_install numexpr (under
 
 1. How to use it
 ----------------
+[New in 0.2.3]
+From version 0.2.3 there is a new method to insert information on the command line. The main differences are related to the input of data 
+filenames, and of the parameters and its initial values. No more commas are need to separate the variables and the values.
 
-Make the bestFit.py executable (under Linux: chmod +x bestFit.py) and run it without any option. The output is the following::
+For instance, fitting two gaussian with a common parameter can be done as:
 
-    Failed: Not enough input filenames specified
+bestFit -f data1.dat data2.dat -t "a*exp(-((x-x01)/sigma)**2)" "b*exp(-((x-x02)/sigma)**2)" -p a b x01 x02 sigma -i 1 1 1 0 1. -d
 
-    Usage summary: bestFit [OPTIONS]
+Make the bestFit.py executable (under Linux: chmod +x bestFit.py) and run it with the -h option. The output is the following::
 
-    OPTIONS:
-    -f, --filename   Filename of the data in form of columns
-    -c, --cols       Columns to get the data (defaults: 0,1); a third number is used for errors' column
-    -v, --vars       Variables (defaults: x,y)
-    -r, --range      Range of the data to consider (i.e. 0:4; 0:-1 takes all)
-    -p, --fitpars    Fitting Parameters names (separated by comas)
-    -i, --initvals   Initial values of the parameters (separated by comas)
-    -t, --theory     Theoretical function to best fit the data (between "...")
-    -s, --sigma      Estimation of the error in the data (as a constant value)
-    -d, --derivs     Use analytical derivatives
-    --lin            Use data in linear mode (default)
-    --log            Use data il log mode (best for log-log data)
-    --noplot         Don't show the plot output
-    --logplot        Use log-log axis to plot data (default if --log)
+usage: bestFit [-h] -f filename [filename ...] -t theory [theory ...] -p
+               params [params ...] -i initvals [initvals ...]
+               [-v var [var ...]] [-c cols [cols ...]] [-r range] [-d]
+               [-s sigma] [--held heldParams [heldParams ...]] [--lin] [--log]
+               [--noplot] [--logplot]
 
-    EXAMPLE
-    bestfit -f mydata.dat -c 0,2 -r 10:-1 -v x,y -p a,b -i 1,1. -t "a+b*x"
+Best fit of data using least-square minimization
 
+optional arguments:
+  -h, --help            show this help message and exit
+  -f filename [filename ...], --filename filename [filename ...]
+                        Filename(s) of the input data
+  -t theory [theory ...], --theory theory [theory ...]
+                        Theoretical function(s)
+  -p params [params ...], --params params [params ...]
+                        Parameter(s) name(s), i.e. -p a b c
+  -i initvals [initvals ...], --initvals initvals [initvals ...]
+                        Initial values of the parameter(s), i.e. -i 1 2. 3.
+  -v var [var ...], --var var [var ...]
+                        Variable(s) names, default: x y
+  -c cols [cols ...], --cols cols [cols ...]
+                        Columns of the file to load the data, default: 0 1
+  -r range, --drange range
+                        Range of the data (as index of rows)
+  -d, --deriv           Use Analytical Derivatives
+  -s sigma, --sigma sigma
+                        Estimation of the error in the data (as a constant
+                        value)
+  --held heldParams [heldParams ...]
+                        Held one or more parameters, i.e. a=3 b=4
+  --lin                 Use data in linear mode (default)
+  --log                 Use data in log mode (best for log-log data)
+  --noplot              Don't show the plot output
+  --logplot             Use log-log axis to plot data (default if --log)
+
+NOTE: --held parameter NOT WORKING YET (as of version 0.2.3)
 
 2. Test the script
 ------------------
@@ -64,9 +85,9 @@ To be sure that the script is working correctly, try one of the test fits includ
 For instance, try to fit the eckerle4 data (see: http://www.itl.nist.gov/div898/strd/nls/data/eckerle4.shtml for details). 
 This is a case considered of high difficulty.
 
-Now copy the following line:: 
+Now copy the following line (see the change from version 0.2.3 - no commas between parameters and initial values):: 
 
-   $ ./bestFit.py -f test/eckerle4/data.dat -p b1,b2,b3 -t "b1/b2*exp(-(x-b3)**2/(2.*b2**2))" -i 1.,10.,500. -c 1,0 -d
+   $ ./bestFit.py -f test/eckerle4/data.dat -p b1 b2 b3 -t "b1/b2*exp(-(x-b3)**2/(2.*b2**2))" -i 1. 10. 500. -c 1 0 -d
 
 [Hint: make a soft link to bestFit.py in your local bin, such as
 ln -s yourDirectory/bestFit.py /usr/local/bin/bestFit
@@ -93,7 +114,7 @@ The results should be similar to my output::
 
 In this run we have used the analytical derivatives with the "-d" option. Try now not to use it, so::
  
-    $ ./bestFit.py -f test/eckerle4/data.dat -p b1,b2,b3 -t "b1/b2*exp(-(x-b3)**2/(2.*b2**2))" -i 1.,10.,500. -c 1,0 
+    $ ./bestFit.py -f test/eckerle4/data.dat -p b1 b2 b3 -t "b1/b2*exp(-(x-b3)**2/(2.*b2**2))" -i 1. 10. 500. -c 1 0 
 
     >>> Initial parameters =  (1.0, 10.0, 500.0)
     >>> initial cost = 7.2230265030e-01 (StD: 1.5023966794e-01)

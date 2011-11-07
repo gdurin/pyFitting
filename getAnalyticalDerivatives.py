@@ -71,7 +71,7 @@ def getDiff(independentVars, function_string, varsDiff):
         # i.e. must have the same lenght of 'x' data
         for var in independentVars:
             if var not in derivative:
-                derivative = "%s*%s/%s" % (derivative, var, var)
+                derivative = "%s*log(exp(%s))" % (derivative, var)
         diffs.append(derivative)
     return diffs
 
