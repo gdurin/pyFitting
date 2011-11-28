@@ -18,13 +18,13 @@ The easiest way to install bestFit is::
 
 It requires the following packages::
 
-python 2.7.x (because of the print("Print this") statement. It can be easily change to the 2.6.x version print "Print this"
+   python 2.7.x (because of the print("Print this") statement. It can be easily change to the 2.6.x version print "Print this"
 
-numpy and scipy  (see http://www.scipy.org)
+   numpy and scipy  (see http://www.scipy.org)
 
-matplotlib (1.0.x - see http://matplotlib.sourceforge.net/ )
+   matplotlib (1.0.x - see http://matplotlib.sourceforge.net/ )
 
-numexpr (see http://code.google.com/p/)
+   numexpr (see http://code.google.com/p/)
 
 If not present, install them with easy_install, i.e. easy_install numexpr (under root)
 
@@ -36,19 +36,19 @@ filenames, and of the parameters and its initial values. No more commas are need
 
 For instance, fitting two gaussian with a common parameter can be done as:
 
-bestFit -f data1.dat data2.dat -t "a*exp(-((x-x01)/sigma)**2)" "b*exp(-((x-x02)/sigma)**2)" -p a b x01 x02 sigma -i 1 1 1 0 1. -d
+   $ bestFit -f data1.dat data2.dat -t "a*exp(-((x-x01)/sigma)**2)" "b*exp(-((x-x02)/sigma)**2)" -p a b x01 x02 sigma -i 1 1 1 0 1. -d
 
 Make the bestFit.py executable (under Linux: chmod +x bestFit.py) and run it with the -h option. The output is the following::
 
-usage: bestFit [-h] -f filename [filename ...] -t theory [theory ...] -p
+  usage: bestFit [-h] -f filename [filename ...] -t theory [theory ...] -p
                params [params ...] -i initvals [initvals ...]
                [-v var [var ...]] [-c cols [cols ...]] [-r range] [-d]
                [-s sigma] [--held heldParams [heldParams ...]] [--lin] [--log]
                [--noplot] [--logplot]
 
-Best fit of data using least-square minimization
+  Best fit of data using least-square minimization
 
-optional arguments:
+  optional arguments:
   -h, --help            show this help message and exit
   -f filename [filename ...], --filename filename [filename ...]
                         Filename(s) of the input data

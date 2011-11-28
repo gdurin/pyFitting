@@ -252,7 +252,7 @@ def plotBestFitT(compositeModel, params0, isPlot='lin'):
     initCost = compositeModel.cost(params0)
     printOut.append(initCost)
     print 'initial cost = %.10e (StD: %.10e)' % compositeModel.cost(params0)
-    maxfev = 50*(len(params0)+1)
+    maxfev = 250*(len(params0)+1)
     factor = 100
     residual = compositeModel.residual
     if compositeModel.isAnalyticalDerivs:
@@ -307,9 +307,9 @@ def plotBestFitT(compositeModel, params0, isPlot='lin'):
     print "n. of data = %d" % lenData
     dof = lenData - len(params)
     print "degree of freedom = %d" % (dof)
-    pValue = 1. - scipy.special.gammainc(dof/2., costValue/2.)
     print "X^2_rel = %f" % (costValue/dof)
-    print "pValue = %f (statistically significant if < 0.05)" % (pValue)
+    #pValue = 1. - scipy.special.gammainc(dof/2., costValue/2.)
+    #print "pValue = %f (statistically significant if < 0.05)" % (pValue)
     ts = round(time() - t0, 3)
     print "*** Time elapsed:", ts
     if isPlot:
@@ -413,7 +413,6 @@ def main():
     
     
     args = parser.parse_args()
-    print args
     fileNames = args.filename
     cols =  args.cols
     variables = args.var
