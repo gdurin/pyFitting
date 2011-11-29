@@ -16,15 +16,15 @@ The easiest way to install bestFit is::
    
     $ git clone git://github.com/gdurin/pyFitting.git
 
-It requires the following packages::
+It requires the following packages
 
-   python 2.7.x (because of the print("Print this") statement. It can be easily change to the 2.6.x version print "Print this"
+python 2.7.x (because of the print("Print this") statement. It can be easily change to the 2.6.x version print "Print this"
 
-   numpy and scipy  (see http://www.scipy.org)
+`numpy and scipy <http://www.scipy.org>`_ 
 
-   matplotlib (1.0.x - see http://matplotlib.sourceforge.net/ )
+`matplotlib <http://matplotlib.sourceforge.net/>`_ (1.0.x)
 
-   numexpr (see http://code.google.com/p/)
+`numexpr <http://code.google.com/p/numexpr/>`_
 
 If not present, install them with easy_install, i.e. easy_install numexpr (under root)
 
@@ -131,3 +131,4 @@ In this run we have used the analytical derivatives with the "-d" option. Try no
     >>> pValue = 1.000000 (statistically significant if < 0.05)
 
 If it is similar, your are done!
+
