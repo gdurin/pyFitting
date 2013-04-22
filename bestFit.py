@@ -58,7 +58,7 @@ def genExpr2Scipy(op, function):
     
     Notes:
     --------
-    Both usual function and special ones are considered
+    Both usual functions and special ones are considered
     """
     try:
         if op in dir(scipy):
@@ -194,6 +194,7 @@ class Model():
             res = (P - self.data.Y)/sigma
         elif self.linlog == 'log':
             res = (scipy.log10(P) - scipy.log10(self.data.Y))/sigma
+            print res
         self.residuals = np.concatenate((self.residuals, res))
         return self.residuals
 
@@ -252,7 +253,7 @@ def plotBestFitT(compositeModel, params0, isPlot='lin'):
     initCost = compositeModel.cost(params0)
     printOut.append(initCost)
     print 'initial cost = %.10e (StD: %.10e)' % compositeModel.cost(params0)
-    maxfev = 250*(len(params0)+1)
+    maxfev = 500*(len(params0)+1)
     factor = 100
     residual = compositeModel.residual
     if compositeModel.isAnalyticalDerivs:
@@ -288,13 +289,9 @@ def plotBestFitT(compositeModel, params0, isPlot='lin'):
                 stDevParams = covmatrix[i,i]**0.5*costStdDev
             par = params[i]
             table.append([compositeModel.parStr[i], par, stDevParams, par/stDevParams])
-            #if abs(params[i]) > 1e5:
-                #print "%s = %.8e +- %.8e" % (theory.parStr[i].ljust(5), params[i], stDevParams)
-            #else:
-                #print "%s = %.8f +- %.8f" % (theory.parStr[i].ljust(5), params[i], stDevParams)
             stOut = compositeModel.parStr[i], '\t', params[i], '+-', stDevParams
-
-            printOut.append(stOut)    
+            printOut.append(stOut)
+            
     print("="*nStars)
     pprint_table(table)
     print("="*nStars)        
@@ -413,6 +410,7 @@ def main():
     
     
     args = parser.parse_args()
+    print args
     fileNames = args.filename
     cols =  args.cols
     variables = args.var
