@@ -243,7 +243,7 @@ class CompositeModel():
                 jac = np.concatenate((jac, model.jacobian(params)), axis=1)
         return jac
 
-def plotBestFitT(compositeModel, params0, isPlot='lin'):
+def plotBestFitT(compositeModel, params0, isPlot='lin',errorbar=None):
     nStars = 80
     print("="*nStars)
     t0 = time()
@@ -284,7 +284,9 @@ def plotBestFitT(compositeModel, params0, isPlot='lin'):
             printOut.append(stOut)
     else:
         for i in range(len(params)):
-            if compositeModel.isSigma: # This is the case of weigthed least-square
+            if compositeModel.isSigma and errorbar=="e": 
+                # This is the case of weigthed least-square
+                # with error bar
                 stDevParams = covmatrix[i,i]**0.5
             else:
                 stDevParams = covmatrix[i,i]**0.5*costStdDev
@@ -399,8 +401,12 @@ def main():
     parser.add_argument('-v', '--var', metavar='var', default='x y', nargs='+',
                         help='Name(s) of the independent variable(s), default: x')
     parser.add_argument('-c','--cols', metavar='cols', default=[0, 1],  type=int, nargs='+',
-                        help='Columns of the file to load the data, default: 0 1 \r a third col \
+                        help='Columns of the file to load the data, default: 0 1 a third col \
                         is used as error bars')
+    parser.add_argument('-w','--weight', action='store_true',
+                        help='Use the 3rd column to weight data')
+    parser.add_argument('-e','--errbar', action='store_true',
+                        help='Use the 3rd column as the true error bar of the data')    
     parser.add_argument('-r', '--drange', metavar='range', default='0:None',
                         help='Range of the data (as index of rows)')
     parser.add_argument('-d', '--deriv', action='store_true',
@@ -458,7 +464,16 @@ def main():
         isPlot = False
     if args.logplot:
         isPlot = 'log'
+    # Deal with error bar and weight
     sigma = args.sigma
+    if args.weight and args.errbar:
+        print "Warning: use the 3rd col as error bar"
+    elif args.weight:
+        errorbar = "w"
+    elif args.errbar:
+        errorbar = "e"
+    else:
+        errorbar = None
 
     dataAndFunction = zip(fileNames, functions)
     models = []
@@ -474,7 +489,7 @@ def main():
             model.sigma = sigma
 
     composite_model = CompositeModel(models, parNames)
-    params = plotBestFitT(composite_model, params0, isPlot)
+    params = plotBestFitT(composite_model, params0, isPlot, errorbar)
 
 
 if __name__ == "__main__":
