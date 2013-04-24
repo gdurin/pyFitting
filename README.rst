@@ -114,7 +114,7 @@ The results should be similar to my output::
 
 In this run we have used the analytical derivatives with the "-d" option. Try now not to use it, so::
  
-    $ ./bestFit.py -f test/eckerle4/data.dat -p b1 b2 b3 -t "b1/b2*exp(-(x-b3)**2/(2.*b2**2))" -i 1. 10. 500. -c 1 0 
+    $ bestFit.py -f test/eckerle4/data.dat -p b1 b2 b3 -t "b1/b2*exp(-(x-b3)**2/(2.*b2**2))" -i 1. 10. 500. -c 1 0 
 
     >>> Initial parameters =  (1.0, 10.0, 500.0)
     >>> initial cost = 7.2230265030e-01 (StD: 1.5023966794e-01)
@@ -134,25 +134,23 @@ If it is similar, your are done!
 
 Try also the test under 2vars:
 
-bestFit -f data1.txt data2.txt -t "A*x**alpha+b1" "A/2*z**(1-b1)" -i 8 .5 .2 -p A alpha b1 -v x z
+    $ bestFit -f data1.txt data2.txt -t "A*x**alpha+b1" "A/2*z**(1-b1)" -i 8 .5 .2 -p A alpha b1 -v x z
 
 showing a large figure with two plots, and something like:
 
 
-Initial parameters =  (8.0, 0.5, 0.2)
-initial cost = 2.6730748489e+02 (StD: 1.7528547648e+00)
-optimized cost = 2.3804426372e-23 (StD: 5.2308134762e-13)
+    >>> Initial parameters =  (8.0, 0.5, 0.2)
+    >>> initial cost = 2.6730748489e+02 (StD: 1.7528547648e+00)
+    >>> optimized cost = 2.3804426372e-23 (StD: 5.2308134762e-13)
 
-parameter    value           st. error         t-statistic
-A              8.4   1.09368924024e-13    7.6804266614e+13
-alpha         0.43   7.38776456836e-15   5.82043453093e+13
-b1             0.3   7.30383553018e-15   4.10743093489e+13
-
-Done in 17 iterations
-The relative error between two consecutive iterates is at most 0.000000
-
-n. of data = 90
-degree of freedom = 87
-X^2_rel = 0.000000
-*** Time elapsed: 0.006
+    >>> parameter    value           st. error         t-statistic
+    >>> A              8.4   1.09368924024e-13    7.6804266614e+13
+    >>> alpha         0.43   7.38776456836e-15   5.82043453093e+13
+    >>> b1             0.3   7.30383553018e-15   4.10743093489e+13
+    >>> Done in 17 iterations
+    >>> The relative error between two consecutive iterates is at most 0.000000
+    >>> n. of data = 90
+    >>> degree of freedom = 87
+    >>> X^2_rel = 0.000000
+    >>> *** Time elapsed: 0.006
 
