@@ -1,3 +1,4 @@
+import sys
 import sympy
 
 # Mappings between sympy and numpy
@@ -62,6 +63,11 @@ def getDiff(independentVars, function_string, varsDiff):
                 print("No analytical derivatives are used")
                 return None
             function_string = function_string.replace(op, opNew)
+        except TypeError as inst:
+            print inst
+            print "You probably used a variable's name which is also a function (i.e. beta, etc)"
+            sys.exit()
+            
         
      # Do the loop over the variables varsDiff
     for variableToDiff in sympyVars:
@@ -76,10 +82,16 @@ def getDiff(independentVars, function_string, varsDiff):
     return diffs
 
 if __name__ == "__main__":
-    f = "b1*gamma(x/b4)+b2/x**b3"
+    #f = "b1*gamma(T/b4)+b2/T**b3"
     #f = "b1*(x/b4)+b2/x**b3"
     #f = "b1*x+b2*x**2+b3*x**3+b4*x**4"
-    derivList = "b1,b2,b3,b4".split(",")
+    #derivList = "b1,b2,b3,b4".split(",")
+    
+    f = 'A*T**(snz)*(1./(1+(T/T0)**(5*(snz-1))))**(1./5)'
+    derivList = "A,snz,T0".split(",")
+    
+    f = "A*x**alpha + Beta"
+    derivList = "A, alpha, Beta".split(",")
     derivs = getDiff("x",f, derivList)
     print f
     for d in derivs:

@@ -59,7 +59,7 @@ Make the bestFit.py executable (under Linux: chmod +x bestFit.py) and run it wit
   -i initvals [initvals ...], --initvals initvals [initvals ...]
                         Initial values of the parameter(s), i.e. -i 1 2. 3.
   -v var [var ...], --var var [var ...]
-                        Variable(s) names, default: x y
+                        Name(s) of the independent variable(s), default: x
   -c cols [cols ...], --cols cols [cols ...]
                         Columns of the file to load the data, default: 0 1
   -r range, --drange range
@@ -131,4 +131,28 @@ In this run we have used the analytical derivatives with the "-d" option. Try no
     >>> pValue = 1.000000 (statistically significant if < 0.05)
 
 If it is similar, your are done!
+
+Try also the test under 2vars:
+
+bestFit -f data1.txt data2.txt -t "A*x**alpha+b1" "A/2*z**(1-b1)" -i 8 .5 .2 -p A alpha b1 -v x z
+
+showing a large figure with two plots, and something like:
+
+================================================================================
+Initial parameters =  (8.0, 0.5, 0.2)
+initial cost = 2.6730748489e+02 (StD: 1.7528547648e+00)
+optimized cost = 2.3804426372e-23 (StD: 5.2308134762e-13)
+================================================================================
+parameter    value           st. error         t-statistic
+A              8.4   1.09368924024e-13    7.6804266614e+13
+alpha         0.43   7.38776456836e-15   5.82043453093e+13
+b1             0.3   7.30383553018e-15   4.10743093489e+13
+================================================================================
+Done in 17 iterations
+The relative error between two consecutive iterates is at most 0.000000
+================================================================================
+n. of data = 90
+degree of freedom = 87
+X^2_rel = 0.000000
+*** Time elapsed: 0.006
 

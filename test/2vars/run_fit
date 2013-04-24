@@ -1,0 +1,2 @@
+bestFit -f data1.txt data2.txt -t "A*x**alpha+b1" "A/2*z**(1-b1)" -i 8 .5 .2 -p A alpha b1 -v x z
+

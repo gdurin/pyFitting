@@ -1,0 +1,8 @@
+x = arange(0,10, 0.2)
+f1 = A*x**alpha + beta
+z = arange(0,10, 0.25)
+f2 = A/2*z**(1-beta)
+
+A = 8.4
+alpha = 0.43
+beta = .3

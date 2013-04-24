@@ -28,7 +28,7 @@ def getColor():
     colors = 'brgcmb'*4
     for i in colors:
         yield i
-    
+
 def getSymbol():
     symbols = "ov^<>12sp*h+D"*3
     for i in symbols:
@@ -37,25 +37,25 @@ def getSymbol():
 def genExpr2Scipy(op, function):
     r"""
     Insert the proper scipy.* module to handle math functions
-    
+
     Parameters:
     ----------------
     op : string
         math function to be replace by the scipy equivalent
     function : string
         the theoretical function
-    
+
     Returns:
     -----------
     function : string
         the theoretical function with the proper scipy method
-        
+
     Example:
     ------------
     >>> f = "sin(x/3.)"
     >>> print genExpr2Scipy("sin", f)
     scipy.sin(x/3.)
-    
+
     Notes:
     --------
     Both usual functions and special ones are considered
@@ -105,6 +105,7 @@ class Theory:
 
     def Y(self, x, params):
         exec "%s = params" % self.parameters
+        exec "%s = x " %self.xName
         if self.heldParams:
             for par in self.heldParams:
                 exec "%s = %s" % (par, str(self.heldParams[par]))
@@ -165,7 +166,7 @@ class DataCurve:
             self.Yerror = data[:,cols[2]][i0:i1]
         else:
             self.Yerror = None
-        
+
     def len(self):
         return len(self.X)
 
@@ -181,7 +182,7 @@ class Model():
         self.dFunc = self.theory.dFunc
         self.linlog = linlog
         self.sigma = self.data.Yerror
-        
+
     def residual(self, params):
         """Calculate residual for fitting"""
         self.residuals = np.array([])
@@ -194,7 +195,7 @@ class Model():
             res = (P - self.data.Y)/sigma
         elif self.linlog == 'log':
             res = (scipy.log10(P) - scipy.log10(self.data.Y))/sigma
-            print res
+            #print res
         self.residuals = np.concatenate((self.residuals, res))
         return self.residuals
 
@@ -225,7 +226,7 @@ class CompositeModel():
         for model in self.models:
             res = np.concatenate((res, model.residual(params)))
         return res
-        
+
     def cost(self, params):
         res = self.residual(params)
         cst = np.dot(res,res)
@@ -233,7 +234,7 @@ class CompositeModel():
         lenData = sum([model.data.len() for model in self.models])
         ser = (cst/(lenData-len(params)))**0.5
         return cst, ser
-    
+
     def jacobian(self, params):
         for i, model in enumerate(self.models):
             if i == 0:
@@ -241,7 +242,7 @@ class CompositeModel():
             else:
                 jac = np.concatenate((jac, model.jacobian(params)), axis=1)
         return jac
-    
+
 def plotBestFitT(compositeModel, params0, isPlot='lin'):
     nStars = 80
     print("="*nStars)
@@ -270,7 +271,7 @@ def plotBestFitT(compositeModel, params0, isPlot='lin'):
     printOut.append(costValue)
     #if compositeModel.isAnalyticalDerivs:
         #jcb = jacobian(params)
-    ## The method of calculating the covariance matrix as
+    # # The method of calculating the covariance matrix as
         #analyCovMatrix = scipy.matrix(scipy.dot(jcb, jcb.T)).I
         #print analyCovMatrix
         #print covmatrix
@@ -291,7 +292,7 @@ def plotBestFitT(compositeModel, params0, isPlot='lin'):
             table.append([compositeModel.parStr[i], par, stDevParams, par/stDevParams])
             stOut = compositeModel.parStr[i], '\t', params[i], '+-', stDevParams
             printOut.append(stOut)
-            
+
     print("="*nStars)
     pprint_table(table)
     print("="*nStars)        
@@ -310,9 +311,16 @@ def plotBestFitT(compositeModel, params0, isPlot='lin'):
     ts = round(time() - t0, 3)
     print "*** Time elapsed:", ts
     if isPlot:
+        # Prepare the plot
+        nModels = len(compositeModel.models)
+        fig = plt.figure()
+        fig.set_size_inches(7*nModels,6,forward=True)
         getCol = getColor()
         getSyb = getSymbol()
+        kFig = 0
         for model in compositeModel.models:
+            kFig += 1
+            ax = fig.add_subplot(1,nModels,kFig)
             X = model.data.X
             Y = model.data.Y
             X1 = scipy.linspace(X[0], X[-1], 300)
@@ -330,7 +338,8 @@ def plotBestFitT(compositeModel, params0, isPlot='lin'):
             if model.sigma is not None:
                 plt.errorbar(X, Y, model.sigma, fmt=None)
             plt.draw()
-        #plt.legend(loc=0)
+            plt.legend(loc=0)
+            plt.xlabel(model.theory.xName, size=14)
         plt.show()
     # Alternative fitting
     #full_output = scipy.optimize.curve_fit(func,data.X,data.Y,params0,None)
@@ -377,10 +386,10 @@ def pprint_table(table, out=sys.stdout):
 
 def main():
     import argparse
-    
+
     parser = argparse.ArgumentParser(description='Best fit of data using least-square minimization')
     parser.add_argument('-f','--filename', metavar='filename', nargs='+', required=True,
-                       help='Filename(s) of the input data')
+                        help='Filename(s) of the input data')
     parser.add_argument('-t','--theory', metavar='theory', nargs='+', required=True,
                         help='Theoretical function(s)')
     parser.add_argument('-p','--params', metavar='params', required=True,  nargs='+',
@@ -388,9 +397,10 @@ def main():
     parser.add_argument('-i','--initvals', metavar='initvals', required=True, type=float, nargs='+',
                         help='Initial values of the parameter(s), i.e. -i 1 2. 3.')
     parser.add_argument('-v', '--var', metavar='var', default='x y', nargs='+',
-                        help='Variable(s) names, default: x y')
+                        help='Name(s) of the independent variable(s), default: x')
     parser.add_argument('-c','--cols', metavar='cols', default=[0, 1],  type=int, nargs='+',
-                       help='Columns of the file to load the data, default: 0 1')
+                        help='Columns of the file to load the data, default: 0 1 \r a third col \
+                        is used as error bars')
     parser.add_argument('-r', '--drange', metavar='range', default='0:None',
                         help='Range of the data (as index of rows)')
     parser.add_argument('-d', '--deriv', action='store_true',
@@ -407,13 +417,13 @@ def main():
                         help=r"Don't show the plot output")
     parser.add_argument('--logplot', action='store_true',
                         help='Use log-log axis to plot data (default if --log)')
-    
-    
+
+
     args = parser.parse_args()
     print args
     fileNames = args.filename
     cols =  args.cols
-    variables = args.var
+    xVariables = args.var
     functions = args.theory
     parNames = ",".join(args.params)
     params0 = tuple(args.initvals)
@@ -424,9 +434,9 @@ def main():
             heldParams[par] = float(val)
     else:
         heldParams = None
-        
+
     dFunc = args.deriv
-    
+
     dataRange = args.drange
     m, M = dataRange.split(":")
     if m == "":
@@ -438,7 +448,7 @@ def main():
     else:
         dataRangeMax = int(M)
     dataRange = dataRangeMin, dataRangeMax
-    
+
     linlog = "lin"
     isPlot = "lin"
     if args.log:
@@ -453,8 +463,11 @@ def main():
     dataAndFunction = zip(fileNames, functions)
     models = []
     nmodels = len(fileNames)
+    if len(xVariables) != nmodels:
+        xVariables = nmodels*xVariables
+        print xVariables
     for i in range(nmodels):
-        model = Model(dataAndFunction[i], cols, dataRange, variables, parNames, \
+        model = Model(dataAndFunction[i], cols, dataRange, xVariables[i], parNames, \
                       heldParams=heldParams, linlog=linlog, dFunc=dFunc)
         models.append(model)
         if model.sigma is None and sigma is not None:
@@ -463,7 +476,7 @@ def main():
     composite_model = CompositeModel(models, parNames)
     params = plotBestFitT(composite_model, params0, isPlot)
 
-    
+
 if __name__ == "__main__":
     plt.ioff()
     main()
