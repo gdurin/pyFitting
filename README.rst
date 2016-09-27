@@ -3,8 +3,6 @@ bestFit: a command-line tool for least-square fitting
 
 A simple python script to perform data fitting using nonlinear least-squares minimization. 
 
-http://emma.inrim.it:8080/gdurin/software/bestfit
-
 The routine is based on the scipy.optimize.leastsq method (see http://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.leastsq.html#scipy.optimize.leastsq), which is a wrapper around MINPACK’s lmdif and lmder algorithms.
 
 This is a command line tool, to keep everything easy and fast to use. 
@@ -71,11 +69,19 @@ Make the bestFit.py executable (under Linux: chmod +x bestFit.py) and run it wit
   --held heldParams [heldParams ...]
                         Held one or more parameters, i.e. a=3 b=4
   --lin                 Use data in linear mode (default)
-  --log                 Use data in log mode (best for log-log data)
+  --log                 Use data in log mode (best for log-log data) 
   --noplot              Don't show the plot output
   --logplot             Use log-log axis to plot data (default if --log)
+  --creep               Use x-axis as x**-mu to plot data
+  --data_logY           Use the log of Y data as input
 
 NOTE: --held parameter NOT WORKING YET (as of version 0.2.3)
+ 
+NOTE: The use of --creep and --data_logY (from version 0.4.0) is still experimental, and must be fixed properly.
+Using data_logY the Y data are replaced by log10(Y), so the fitting function has to be changed as well.
+This is usefull for fitting data for creep:
+Using v = v0 * exp(-(Hd/H)**mu), with v0, Hd and mu as fitting parameters can be difficult. Using data_logY implies to
+use lv0 - (Hd/H)**mu, with lv0 = log10(v0).
 
 2. Test the script
 ------------------
