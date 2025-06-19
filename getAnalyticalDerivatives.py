@@ -59,13 +59,13 @@ def getDiff(independentVars, function_string, varsDiff):
             elif op in dir(sympy):
                 opNew = "sympy."+ op
             else:
-                print("Warning: %s does not exist in sympy" % op)
+                print(("Warning: %s does not exist in sympy" % op))
                 print("No analytical derivatives are used")
                 return None
             function_string = function_string.replace(op, opNew)
         except TypeError as inst:
-            print inst
-            print "You probably used a variable's name which is also a function (i.e. beta, etc)"
+            print(inst)
+            print("You probably used a variable's name which is also a function (i.e. beta, etc)")
             sys.exit()
             
         
@@ -93,6 +93,6 @@ if __name__ == "__main__":
     f = "A*x**alpha + Beta"
     derivList = "A, alpha, Beta".split(",")
     derivs = getDiff("x",f, derivList)
-    print f
+    print(f)
     for d in derivs:
-        print d
+        print(d)

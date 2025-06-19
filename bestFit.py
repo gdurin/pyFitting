@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env 
 
 """bestFit is a simple python script to perform data fitting 
 using nonlinear least-squares minimization.
@@ -7,7 +7,7 @@ import sys, os
 import locale
 import argparse
 import scipy
-from scipy.optimize.minpack import leastsq
+from scipy.optimize import leastsq
 import scipy.special as special
 import numpy as np
 from numpy import pi
@@ -61,8 +61,8 @@ def genExpr2Scipy(op, function):
     Both usual functions and special ones are considered
     """
     try:
-        if op in dir(scipy):
-            sub = "scipy."
+        if op in dir(np):
+            sub = "np."
             function = function.replace(op, sub+op)
         elif op in dir(special):
             op_occurrences = [q for q in dir(special) if op in q]
@@ -76,7 +76,7 @@ def genExpr2Scipy(op, function):
                 function = function.replace(op, sub+op)
         return function
     except:
-        print("Function %s not defined in scipy" % op)
+        print(("Function %s not defined in numpy" % op))
         return None
 
 class Theory:
@@ -97,7 +97,7 @@ class Theory:
             self.dFunc = getDiff(xName, function, paramsNamesList)
             try: 
                 # Then try to compile them  to be reused by NumExpr
-                self.dFuncCompiled = map(ne.NumExpr, self.dFunc)
+                self.dFuncCompiled = list(map(ne.NumExpr, self.dFunc))
             except TypeError:
                 print("Warning:  one or more functions are undefined in NumExpr")
                 self.dFuncCompiled = None
@@ -106,24 +106,24 @@ class Theory:
         # Check if there is only a parameter
         if len(params) == 1:
             params = params[0]
-        exec "%s = params" % self.parameters
-        exec "%s = x " % self.xName
+        exec("%s = params" % self.parameters)
+        exec("%s = x " % self.xName)
         # Check if the function needs to be changed with scipy.functions
         if self.checkFunction:
             while self.checkFunction:
                 try:
-                    exec "f = %s" % (self.fz)
+                    exec("f = %s" % (self.fz))
                     self.checkFunction = False
                 except NameError as inst:
-                    op = inst.message.split("'")[1]
+                    op = inst.name.split("\'")[0]
                     function = genExpr2Scipy(op, self.fz)
                     if function:
                         self.fz = function
                     else:
                         raise ValueError("Function %s not found" % op)
-        else:
-            exec "f = %s" % (self.fz)
-        return f
+        return eval(self.fz)
+        #print(self.parameters, self.xName, self.fz)
+        #return f
 
     def jacobian(self, x, params):
         """
@@ -131,17 +131,17 @@ class Theory:
         """
         jb = []
         checkDerivative = True
-        exec "%s = params" % self.parameters
-        exec "%s = x" % self.xName
+        exec("%s = params" % self.parameters)
+        exec("%s = x" % self.xName)
         if self.dFuncCompiled:
             for q in self.dFuncCompiled:
-                values = map(eval, q.input_names)
+                values = list(map(eval, q.input_names))
                 jb.append(q(*values))
         else:
             for i, q in enumerate(self.dFunc):
                 while checkDerivative:
                     try:
-                        exec "deriv = %s" % q
+                        exec("deriv = %s" % q)
                         self.dFunc[i] = q
                         checkDerivative = False
                     except NameError as inst:
@@ -149,7 +149,7 @@ class Theory:
                         q = genExpr2Scipy(op, q)
                 jb.append(deriv)
                 checkDerivative = True
-        return scipy.array(jb)
+        return np.array(jb)
 
 class DataCurve:
     def __init__(self, input_data, cols, dataRange=None, data_logY=False):
@@ -158,7 +158,7 @@ class DataCurve:
             if os.path.isfile(input_data):
                 print("File %s exists" % input_data)
                 self.fileName = input_data
-                data = scipy.loadtxt(input_data)
+                data = np.loadtxt(input_data)
                 self.X, self.Y, self.Yerror = self.get_data(data, cols)
                 if data_logY:
                     print("Y Data in log scale")
@@ -180,7 +180,7 @@ class DataCurve:
                 self.Yerror = self.Yerr[i0:i1]
 
     def get_data(self, data, cols):
-        print data.shape
+        print(data.shape)
         x = data[:, cols[0]]
         y = data[:, cols[1]]
         if len(cols) > 2:
@@ -190,7 +190,7 @@ class DataCurve:
         return x, y, yerr
 
     def select_data(self, x, dataRange):
-        rngType, = dataRange.keys()
+        rngType, = list(dataRange.keys())
         if rngType == 'indx':
             i0, i1 = dataRange['indx']
             if i0 == 'min':
@@ -267,7 +267,7 @@ class CompositeModel():
                 self.isAnalyticalDerivs = True
 
     def residual(self, params):
-        res = scipy.array([])
+        res = np.array([])
         for model in self.models:
             res = np.concatenate((res, model.residual(params)))
         return res
@@ -312,14 +312,14 @@ def plotBestFit(compositeModel, params0, isPlot='lin',
     printOut = []
     table = []
     table.append(['parameter', 'value', 'st. error', 't-statistic'])
-    print "Initial parameters = ", params0
+    print("Initial parameters = ", params0)
     initCost = compositeModel.cost(params0)
     printOut.append(initCost)
-    print 'initial cost = %.10e (StD: %.10e)' % compositeModel.cost(params0)
+    print('initial cost = %.10e (StD: %.10e)' % compositeModel.cost(params0))
     full_output = doBestFit(compositeModel, params0)
     params, covmatrix, infodict, mesg, ier = full_output
     costValue, costStdDev = compositeModel.cost(params)
-    print 'optimized cost = %.10e (StD: %.10e)' % (costValue, costStdDev)
+    print('optimized cost = %.10e (StD: %.10e)' % (costValue, costStdDev))
     printOut.append(costValue)
     #if compositeModel.isAnalyticalDerivs:
         #jcb = jacobian(params)
@@ -332,7 +332,7 @@ def plotBestFit(compositeModel, params0, isPlot='lin',
     if covmatrix is None: # fitting not converging
         for i in range(len(params)):
             stOut = compositeModel.parStr[i], '\t', params[i]
-            print compositeModel.parStr[i], '\t', params[i]
+            print(compositeModel.parStr[i], '\t', params[i])
             printOut.append(stOut)
     else:
         for i in range(len(params)):
@@ -347,23 +347,23 @@ def plotBestFit(compositeModel, params0, isPlot='lin',
             stOut = compositeModel.parStr[i], '\t', params[i], '+-', stDevParams
             printOut.append(stOut)
 
-    print("="*nStars)
+    print(("="*nStars))
     pprint_table(table)
-    print("="*nStars)        
-    print "Done in %d iterations" % infodict['nfev']
-    print mesg
-    print("="*nStars)
+    print(("="*nStars))        
+    print("Done in %d iterations" % infodict['nfev'])
+    print(mesg)
+    print(("="*nStars))
     # Chi2 test
     # n. of degree of freedom
     lenData = sum([model.data.len() for model in compositeModel.models])
-    print "n. of data = %d" % lenData
+    print("n. of data = %d" % lenData)
     dof = lenData - len(params)
-    print "degree of freedom = %d" % (dof)
-    print "X^2_rel = %f" % (costValue/dof)
+    print("degree of freedom = %d" % (dof))
+    print("X^2_rel = %f" % (costValue/dof))
     #pValue = 1. - scipy.special.gammainc(dof/2., costValue/2.)
     #print "pValue = %f (statistically significant if < 0.05)" % (pValue)
     ts = round(time() - t0, 3)
-    print "*** Time elapsed:", ts
+    print("*** Time elapsed:", ts)
     if isPlot:
         # Prepare the plot
         nModels = len(compositeModel.models)
@@ -377,11 +377,11 @@ def plotBestFit(compositeModel, params0, isPlot='lin',
             ax = fig.add_subplot(1, nModels, kFig)
             X = model.data.X
             Y = model.data.Y
-            X1 = scipy.linspace(X[0], X[-1], 300)
+            X1 = np.linspace(X[0], X[-1], 300)
             calculatedData= model.theory.Y(X1, params)
-            color = getCol.next()
-            style = getSyb.next() + color
-            color = getCol.next()
+            color = next(getCol)
+            style = next(getSyb) + color
+            color = next(getCol)
             labelData = model.data.fileName
             labelTheory = model.theory.fzOriginal
             if isPlot == "lin":
@@ -399,7 +399,7 @@ def plotBestFit(compositeModel, params0, isPlot='lin',
                 plt.loglog(X, Y, style, label=labelData)
                 plt.loglog(X1, calculatedData, color, label=labelTheory)
             if model.sigma is not None:
-                plt.errorbar(X, Y, model.sigma, fmt=None)
+                plt.errorbar(X, Y, yerr=model.sigma, fmt="")
             plt.draw()
             plt.legend(loc=0)
             if isPlot == 'creep':
@@ -423,7 +423,7 @@ def format_num(num):
     Adds commas, etc. Will truncate floats into ints!"""
     try:
         inum = int(num)
-        return locale.format("%.5f", (0, inum), True)
+        return locale.format_string("%.5e", (0, inum), True)
     except (ValueError, TypeError):
         return str(num)
 
@@ -436,7 +436,7 @@ def pprint_table(table, out=sys.stdout):
     @param out: Output stream (file-like object)
     @param table: The table to print. A list of lists.
     Each row must have the same number of columns. """
-
+    print(table)
     col_paddings = []
 
     for i in range(len(table[0])):
@@ -444,12 +444,13 @@ def pprint_table(table, out=sys.stdout):
 
     for row in table:
         # left col
-        print >> out, row[0].ljust(col_paddings[0] + 1),
+        print(row[0].ljust(col_paddings[0] + 1), end=' ', file=out)
         # rest of the cols
         for i in range(1, len(row)):
             col = format_num(row[i]).rjust(col_paddings[i] + 2)
-            print >> out, col,
-        print >> out
+            col = row[i]
+            print(f"{col}", end=' ', file=out)
+        print(file=out)
         
 def split_range(rng):
     if ":" not in rng:
@@ -466,6 +467,7 @@ def split_range(rng):
     return rngMin, rngMax  
 
 def main(args=None):
+    print(args)
     if not args:
         parser = argparse.ArgumentParser(description='Best fit of data using least-square minimization')
         parser.add_argument('-f','--filename', metavar='filename', nargs='+', required=True,
@@ -508,11 +510,11 @@ def main(args=None):
         parser.add_argument('--data_logY', action='store_true',
                             help='Use the log of Y data as input')
         args = parser.parse_args()
-        print args
+        print(args)
     else:
         pass
-        print "Passing data: ", args.filename
-        print args.theory
+        print("Passing data: ", args.filename)
+        print(args.theory)
     #
     # Analyze input
     #
@@ -571,7 +573,7 @@ def main(args=None):
     else:
         errorbar = None
 
-    dataAndFunction = zip(fileNames, functions)
+    dataAndFunction = list(zip(fileNames, functions))
     models = []
     nmodels = len(fileNames)
     if len(xVariables) != nmodels:
