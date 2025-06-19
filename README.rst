@@ -32,9 +32,9 @@ If not present, install them with easy_install, i.e. easy_install numexpr (under
 From version 0.2.3 there is a new method to insert information on the command line. The main differences are related to the input of data 
 filenames, and of the parameters and its initial values. No more commas are need to separate the variables and the values.
 
-For instance, fitting two gaussian with a common parameter can be done as:
+For instance, fitting two data fie with a common fitting parameter can be done as:
 
-   $ bestFit -f data1.dat data2.dat -t "a*exp(-((x-x01)/sigma)**2)" "b*exp(-((x-x02)/sigma)**2)" -p a b x01 x02 sigma -i 1 1 1 0 1. -d
+   $ python3 bestFit.py -f test/2vars/data1.txt test/2vars/data2.txt -t "A*x**alpha+b1" "A/2*z**(1-b1)" -i 8 .5 .6 -p A alpha b1 -v x z
 
 Make the bestFit.py executable (under Linux: chmod +x bestFit.py) and run it with the -h option. The output is the following::
 
